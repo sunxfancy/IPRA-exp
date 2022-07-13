@@ -1,0 +1,9 @@
+[submodule "autofdo"]
+	path = autofdo
+	url = git@github.com:sunxfancy/autofdo.git
+[submodule "FDO"]
+	path = FDO
+	url = git@github.com:sunxfancy/FDO.git
+[submodule "LLVM-IPRA"]
+	path = LLVM-IPRA
+	url = git@github.com:sunxfancy/LLVM-IPRA.git
