@@ -1,3 +1,7 @@
-build/
-install/
-.vscode/
+/build/
+/install/
+/.vscode/
+/benchmarks/*
+!/benchmarks/bench.mk
+!/benchmarks/dparser
+!/benchmarks/example

@@ -2,8 +2,12 @@ AUTOFDO_BUILD_TYPE=Release
 LLVM_BUILD_TYPE=Release
 
 PWD=$(shell pwd)
+FDO=install/FDO
+
 .PHONY: build check-tools check-devlibs
-build: check-tools check-devlibs install/autofdo install/FDO
+build: check-tools check-devlibs install/autofdo install/FDO install/counter
+
+include benchmarks/bench.mk
 
 define tool-available
     $(eval $(1) := $(shell which $(2)))
@@ -14,6 +18,7 @@ check-tools:
 	$(eval $(call tool-available,HAS_CMAKE,cmake))
 	$(eval $(call tool-available,HAS_GXX,g++))
 	$(eval $(call tool-available,HAS_NINJA,ninja))
+	$(eval $(call tool-available,HAS_MOLD,mold))
 	$(eval $(call tool-available,HAS_GOLANG,go))
 
 define lib-available
@@ -30,9 +35,10 @@ check-devlibs:
 
 
 install/autofdo: build/autofdo
-	cmake --build build/autofdo --config ${AUTOFDO_BUILD_TYPE} -j $(nproc) --target install
+	mold -run cmake --build build/autofdo --config ${AUTOFDO_BUILD_TYPE} -j $(nproc) --target install
 	mkdir -p install/autofdo
 	cp build/autofdo/create_llvm_prof install/autofdo/create_llvm_prof
+	cp build/autofdo/create_reg_prof install/autofdo/create_reg_prof
 	cp build/autofdo/profile_merger install/autofdo/profile_merger
 	cp build/autofdo/sample_merger install/autofdo/sample_merger
 
@@ -45,7 +51,7 @@ build/autofdo: autofdo install/llvm
 
 install/llvm: build/llvm
 	mkdir -p install/llvm
-	cmake --build build/llvm --config ${LLVM_BUILD_TYPE} -j $(nproc) --target install
+	mold -run cmake --build build/llvm --config ${LLVM_BUILD_TYPE} -j $(nproc) --target install
 
 build/llvm: LLVM-IPRA
 	mkdir -p build
@@ -63,3 +69,8 @@ install/FDO: FDO
 	mkdir -p install 
 	cd FDO && go build .
 	mv FDO/FDO install/FDO
+
+install/counter: counter/counter.go
+	mkdir -p install
+	cd counter && go build counter.go
+	mv counter/counter install/counter
