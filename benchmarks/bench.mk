@@ -1,6 +1,7 @@
 CC = $(PWD)/install/llvm/bin/clang
 CXX = $(PWD)/install/llvm/bin/clang++
 ENABLE_IPRA =  -mllvm -enable-ipra
+ENABLE_IPRA_LTO = -Wl,-mllvm -Wl,-enable-ipra
 NO_IPRA = 
 COUNTER = $(PWD)/install/counter
 FDO = $(PWD)/install/FDO
@@ -29,4 +30,6 @@ benchmarks/mysql-experiment:
 	cd benchmarks && git clone git@github.com:sunxfancy/mysql-experiment.git
 
 
-include benchmarks/example/example.mk
+include benchmarks/example-hotpath/example.mk
+include benchmarks/example-scalable/example.mk
+include benchmarks/example-virtualcall/example.mk

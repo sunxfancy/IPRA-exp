@@ -4,4 +4,4 @@
 /benchmarks/*
 !/benchmarks/bench.mk
 !/benchmarks/dparser
-!/benchmarks/example
+!/benchmarks/example*

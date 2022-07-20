@@ -1,14 +1,13 @@
 #include <stdlib.h>
 
-// This function can only 
 
-int global = 0;
+// This function is calling printf so the registers have been used up
 __attribute__((noinline))
 size_t report(size_t a) {
     static size_t first = 1;
     if (first == 1) {
         first = 0;
-        global = a;
+        printf("%zu %zu %zu %zu %zu\n", a, a+1, a+2, a+3, a+4);
     }
     return 0;
 }
@@ -37,13 +36,13 @@ size_t func(size_t k) {
 
 
 
-
 int main(int argc, char *argv[]) {
     size_t k = 0;
     k = atoi(argv[1]);
+    size_t ans = 0;
     for (size_t i = 0; i < 100; ++i) {
-        printf("ans = %zu\n", func(k));    
+        ans += func(k);
     }
-    printf("global = %zu\n", global);
+    printf("ans = %zu\n", ans);    
     return 0;
 }
