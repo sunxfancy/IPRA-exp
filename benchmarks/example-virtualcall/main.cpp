@@ -5,18 +5,25 @@ using namespace std;
 struct Shape {
     virtual void draw(int num) = 0;
 };
+int g = 0;
 
 struct Circle : Shape {
-    virtual void draw(int num) override {
-        printf("Draw %d %s\n", num, "circles");
-    }
+    __attribute__((noinline))
+    void draw(int num) override;
 };
+__attribute__((noinline))
+void Circle::draw(int num) {
+    g = 1;
+}
 
 struct Square : Shape {
-    virtual void draw(int num) override {
-        printf("Draw %d %s\n", num, "squares");
-    }
+    __attribute__((noinline))
+    void draw(int num) override;
 };
+__attribute__((noinline))
+void Square::draw(int num) {
+    printf("Draw %d %s\n", num, "squares");
+}
 
 __attribute__((noinline))
 size_t foo(Shape* s, size_t k) {
@@ -26,7 +33,7 @@ size_t foo(Shape* s, size_t k) {
     size_t d = k-4;
     size_t e = k+5;
     for (size_t i = 0; i < k; ++i) {
-        if (i == k-1) {
+        if (i < k/2) {
             s->draw(10);
         } else {
             a += 1;
@@ -44,5 +51,6 @@ int main(int argc, char** argv) {
     k = atoi(argv[1]);
     Shape* s = new Circle();
     printf("ans = %zu", foo(s, k));    
+    printf("g = %d\n", g);
     return 0;
 }

@@ -52,6 +52,7 @@ build/autofdo: autofdo install/llvm
 install/llvm: build/llvm
 	mkdir -p install/llvm
 	mold -run cmake --build build/llvm --config ${LLVM_BUILD_TYPE} -j $(nproc) --target install
+	mold -run cmake --build build/llvm --config ${LLVM_BUILD_TYPE} -j $(nproc) --target install-profile
 
 build/llvm: LLVM-IPRA
 	mkdir -p build
@@ -64,6 +65,9 @@ build/llvm: LLVM-IPRA
 		-DLLVM_ENABLE_RTTI=ON \
 		-DLLVM_ENABLE_PROJECTS="clang;lld;compiler-rt;bolt" \
 		-DCMAKE_INSTALL_PREFIX=install/llvm
+
+benchmarks:
+	$(MAKE) -C benchmarks
 
 install/FDO: FDO
 	mkdir -p install 

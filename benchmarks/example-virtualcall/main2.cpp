@@ -4,24 +4,28 @@ using namespace std;
 
 struct Shape {
     virtual void draw(int num) = 0;
-
-    __attribute__((noinline))
-    void draw2(int num) {
-        
-    }
+    void draw2(int num);
 };
+
+__attribute__((noinline))
+void Shape::draw2(int num) {
+}
 
 struct Circle : Shape {
-    virtual void draw(int num) override {
-        printf("Draw %d %s\n", num, "circles");
-    }
+    void draw(int num) override;
 };
 
+void Circle::draw(int num) {
+    printf("Draw %d %s\n", num, "circles");
+}
+
 struct Square : Shape {
-    virtual void draw(int num) override {
-        printf("Draw %d %s\n", num, "squares");
-    }
+    void draw(int num) override;
 };
+
+void Square::draw(int num) {
+    printf("Draw %d %s\n", num, "squares");
+}
 
 __attribute__((noinline))
 size_t foo(Shape* s, size_t k) {

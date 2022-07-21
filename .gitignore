@@ -1,7 +1,10 @@
 /build/
 /install/
 /.vscode/
-/benchmarks/*
-!/benchmarks/bench.mk
-!/benchmarks/dparser
-!/benchmarks/example*
+/benchmarks/C_FFT-master
+/benchmarks/dparser-master
+/benchmarks/mysql-experiment
+/benchmarks/SNU-real-time
+/benchmarks/vorbis-tools-master
+.gdb_history
+
