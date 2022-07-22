@@ -1,7 +1,7 @@
 #include <iostream>
 #include <cstdlib>
 using namespace std;
-
+int g = 0;
 struct Shape {
     virtual void draw(int num) = 0;
     void draw2(int num);
@@ -9,6 +9,7 @@ struct Shape {
 
 __attribute__((noinline))
 void Shape::draw2(int num) {
+    g = num;
 }
 
 struct Circle : Shape {

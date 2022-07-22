@@ -29,19 +29,21 @@ download/mysql-experiment:
 include benchmarks/example-hotpath/example.mk
 include benchmarks/example-scalable/example.mk
 include benchmarks/example-virtualcall/example.mk
+include benchmarks/example-no-caller-saved/example.mk
 
 mysql:
 	rm -f mysql.output
 	rm -rf benchmarks/mysql-experiment/pgolto-mysql
 	rm -f /tmp/count-push-pop.txt 
 	cd benchmarks/mysql-experiment && make pgolto-mysql/install/bin/mysqld 
-	cat /tmp/count-push-pop.txt > mysql.output 
-	echo "------------------" > mysql.output
+	cat /tmp/count-push-pop.txt >> mysql.output 
+	echo "------------------" >> mysql.output
 	rm -rf benchmarks/mysql-experiment/pgolto-ipra-mysql
 	rm -f /tmp/count-push-pop.txt 
 	cd benchmarks/mysql-experiment && make pgolto-ipra-mysql/install/bin/mysqld 
-	cat /tmp/count-push-pop.txt > mysql.output 
+	cat /tmp/count-push-pop.txt >> mysql.output 
+	echo "------------------" >> mysql.output
 	rm -rf benchmarks/mysql-experiment/pgolto-ipra-full-mysql
 	rm -f /tmp/count-push-pop.txt 
 	cd benchmarks/mysql-experiment && make pgolto-ipra-full-mysql/install/bin/mysqld
-	cat /tmp/count-push-pop.txt > mysql.output 
+	cat /tmp/count-push-pop.txt >> mysql.output 
