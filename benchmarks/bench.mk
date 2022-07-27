@@ -49,6 +49,10 @@ mysql:
 	rm -f /tmp/count-push-pop.txt 
 	cd benchmarks/mysql-experiment && make pgolto-ipra-full-mysql/install/bin/mysqld
 	cat /tmp/count-push-pop.txt >> mysql.output 
+	rm -rf benchmarks/mysql-experiment/pgolto-fdoipra-full-mysql
+	rm -f /tmp/count-push-pop.txt 
+	cd benchmarks/mysql-experiment && make pgolto-fdoipra-full-mysql/install/bin/mysql
+	cat /tmp/count-push-pop.txt >> mysql.output 
 
 
 include benchmarks/clang/test.mk
