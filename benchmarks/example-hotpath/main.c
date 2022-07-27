@@ -1,5 +1,5 @@
 #include <stdlib.h>
-
+#include <stdio.h>
 
 // This function is calling printf so the registers have been used up
 __attribute__((noinline))
@@ -21,7 +21,7 @@ size_t func(size_t k) {
     size_t e = k+5;
 
     for (size_t i = 0; i < k; ++i) {
-        if (i == k-1) {
+        if (i == k-1 ) {
             report(a);
         } else {
             a += 1;
@@ -40,8 +40,8 @@ int main(int argc, char *argv[]) {
     size_t k = 0;
     k = atoi(argv[1]);
     size_t ans = 0;
-    for (size_t i = 0; i < 100; ++i) {
-        ans += func(k);
+    for (size_t i = 0; i < k; ++i) {
+        ans += func(i);
     }
     printf("ans = %zu\n", ans);    
     return 0;

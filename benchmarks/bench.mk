@@ -2,6 +2,8 @@ CC = $(PWD)/install/llvm/bin/clang
 CXX = $(PWD)/install/llvm/bin/clang++
 ENABLE_IPRA =  -mllvm -enable-ipra
 ENABLE_IPRA_LTO = -Wl,-mllvm -Wl,-enable-ipra
+ENABLE_COUNT_PUSH_POP = -mllvm -count-push-pop 
+ENABLE_COUNT_PUSH_POP_LTO = -Wl,-mllvm -Wl,-count-push-pop
 NO_IPRA = 
 COUNTER = $(PWD)/install/counter
 FDO = $(PWD)/install/FDO
@@ -47,3 +49,6 @@ mysql:
 	rm -f /tmp/count-push-pop.txt 
 	cd benchmarks/mysql-experiment && make pgolto-ipra-full-mysql/install/bin/mysqld
 	cat /tmp/count-push-pop.txt >> mysql.output 
+
+
+include benchmarks/clang/test.mk

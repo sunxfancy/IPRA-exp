@@ -5,7 +5,7 @@ int g = 0;
 
 __attribute__((noinline))
 void with_caller_saved(size_t a, size_t b, size_t c, size_t d, size_t e) {
-    g = a-1+b+2*c-d-e;;
+    g = a-1+b+2*c-d-e;
 }
 
 
@@ -18,7 +18,7 @@ size_t func2(size_t k) {
     size_t e = k+5;
 
     for (size_t i = 0; i < k; ++i) {
-        if (i == k-1) {
+        if (i == k-1 && k == 10) {
             with_caller_saved(a,b,c,d,e);
         } else {
             a += 1;
@@ -38,7 +38,7 @@ int main(int argc, char *argv[]) {
     k = atoi(argv[1]);
     size_t ans = 0;
     for (size_t i = 0; i < 100; ++i) {
-        ans += func2(k);
+        ans += func2(i);
     }
     printf("ans = %zu\n", ans);    
     return 0;

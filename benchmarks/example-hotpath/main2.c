@@ -1,4 +1,5 @@
 #include <stdlib.h>
+#include <stdio.h>
 
 // This function can only 
 
@@ -43,8 +44,8 @@ int main(int argc, char *argv[]) {
     size_t k = 0;
     k = atoi(argv[1]);
     size_t ans = 0;
-    for (size_t i = 0; i < 100; ++i) {
-        ans += func(k);
+    for (size_t i = 0; i < k; ++i) {
+        ans += func(i);
     }
     printf("ans = %zu\n", ans);    
     return 0;

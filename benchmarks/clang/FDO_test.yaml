@@ -1,6 +1,6 @@
 commands:
-  - ./example 500
-binary: ./example
+  - ./perf_commands.sh
+binary: ./bin/clang
 
 clangpath: ../../install/llvm/bin
 propellerpath: ../../install/autofdo

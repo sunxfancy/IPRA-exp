@@ -1,5 +1,5 @@
 AUTOFDO_BUILD_TYPE=Release
-LLVM_BUILD_TYPE=Release
+LLVM_BUILD_TYPE=RelWithDebInfo
 
 PWD=$(shell pwd)
 FDO=install/FDO
@@ -35,7 +35,7 @@ check-devlibs:
 
 
 install/autofdo: build/autofdo
-	mold -run cmake --build build/autofdo --config ${AUTOFDO_BUILD_TYPE} -j $(nproc) --target install
+	mold -run cmake --build build/autofdo --config ${AUTOFDO_BUILD_TYPE} -j $(shell nproc) --target install
 	mkdir -p install/autofdo
 	cp build/autofdo/create_llvm_prof install/autofdo/create_llvm_prof
 	cp build/autofdo/create_reg_prof install/autofdo/create_reg_prof
@@ -51,8 +51,11 @@ build/autofdo: autofdo install/llvm
 
 install/llvm: build/llvm
 	mkdir -p install/llvm
-	mold -run cmake --build build/llvm --config ${LLVM_BUILD_TYPE} -j $(nproc) --target install
-	mold -run cmake --build build/llvm --config ${LLVM_BUILD_TYPE} -j $(nproc) --target install-profile
+	mold -run cmake --build build/llvm --config ${LLVM_BUILD_TYPE} -j $(shell nproc) --target install
+	mold -run cmake --build build/llvm --config ${LLVM_BUILD_TYPE} -j $(shell nproc) --target install-profile
+
+build/clang:
+	mold -run cmake --build build/llvm --config ${LLVM_BUILD_TYPE} -j $(shell nproc) --target clang
 
 build/llvm: LLVM-IPRA
 	mkdir -p build
