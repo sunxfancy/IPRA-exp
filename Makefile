@@ -6,8 +6,8 @@ FDO=install/FDO
 
 LLVM_BIN = $(PWD)/install/llvm/bin
 
-CC = $(PWD)/install/llvm/bin/clang
-CXX = $(PWD)/install/llvm/bin/clang++
+NCC = $(PWD)/install/llvm/bin/clang
+NCXX = $(PWD)/install/llvm/bin/clang++
 ENABLE_IPRA =  -mllvm -enable-ipra
 ENABLE_IPRA_LTO = -Wl,-mllvm -Wl,-enable-ipra
 ENABLE_COUNT_PUSH_POP = -mllvm -count-push-pop 

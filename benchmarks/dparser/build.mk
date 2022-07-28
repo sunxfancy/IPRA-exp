@@ -6,8 +6,8 @@ all:
 build.dir/dparser.ipra:
 	mkdir -p build.dir/dparser.ipra
 	cd build.dir/dparser.ipra && cmake ../../source.dir/dparser-master -G Ninja \
-	 	-DCMAKE_C_COMPILER=$(CC) \
-		-DCMAKE_CXX_COMPILER=$(CXX) \
+	 	-DCMAKE_C_COMPILER=$(NCC) \
+		-DCMAKE_CXX_COMPILER=$(NCXX) \
 		-DCMAKE_C_FLAGS="-fno-inline-functions -flto=full -fuse-ld=lld" \
 		-DCMAKE_CXX_FLAGS="-fno-inline-functions -flto=full -fuse-ld=lld" \
 		-DCMAKE_EXE_LINKER_FLAGS="-flto=full  -fuse-ld=lld -Wl,-mllvm -Wl,-enable-ipra" \
@@ -21,8 +21,8 @@ build.dir/dparser.ipra:
 build.dir/dparser:
 	mkdir -p build.dir/dparser
 	cd build.dir/dparser && cmake ../../source.dir/dparser-master -G Ninja \
-	 	-DCMAKE_C_COMPILER=$(CC) \
-		-DCMAKE_CXX_COMPILER=$(CXX) \
+	 	-DCMAKE_C_COMPILER=$(NCC) \
+		-DCMAKE_CXX_COMPILER=$(NCXX) \
 		-DCMAKE_C_FLAGS="-fno-inline-functions -flto=full -fuse-ld=lld" \
 		-DCMAKE_CXX_FLAGS="-fno-inline-functions -flto=full -fuse-ld=lld" \
 		-DCMAKE_EXE_LINKER_FLAGS="-flto=full  -fuse-ld=lld" \
@@ -48,8 +48,8 @@ dparser:
 dparser.ipra:
 	mkdir -p bench.dir/dparser.ipra
 	cd bench.dir/dparser.ipra && cmake ../../source.dir/dparser-master -G Ninja \
-	 	-DCMAKE_C_COMPILER=$(CC) \
-		-DCMAKE_CXX_COMPILER=$(CXX) \
+	 	-DCMAKE_C_COMPILER=$(NCC) \
+		-DCMAKE_CXX_COMPILER=$(NCXX) \
 		-DCMAKE_C_FLAGS="-fno-inline-functions -flto=full -fuse-ld=lld" \
 		-DCMAKE_CXX_FLAGS="-fno-inline-functions -flto=full -fuse-ld=lld" \
 		-DCMAKE_EXE_LINKER_FLAGS="-flto=full  -fuse-ld=lld -Wl,-mllvm -Wl,-enable-ipra -Wl,-mllvm -Wl,-ipra-profile=../dparser/prof.txt" \
