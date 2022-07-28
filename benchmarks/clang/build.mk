@@ -1,32 +1,35 @@
 
-LLVM = $(PWD)/benchmarks/clang/llvm-project-llvmorg-14.0.6/llvm
+PWD := $(shell pwd)
+LLVM = $(PWD)/llvm-project-llvmorg-14.0.6/llvm
 
 # TODO: change this makefile to support clang test
 
-.baseline: .trunk 
+all: .baseline .instrumented .pgo-opt-clang
+
+.baseline: 
 	mkdir -p build.dir/baseline
 	mkdir -p install.dir/baseline
 	cd build.dir/baseline && cmake -G Ninja $(LLVM) \
 		-DCMAKE_BUILD_TYPE=Release \
 		-DLLVM_TARGETS_TO_BUILD=X86 \
 		-DLLVM_OPTIMIZED_TABLEGEN=On \
-		-DCMAKE_C_COMPILER=$(TRUNK)/clang \
-		-DCMAKE_CXX_COMPILER=$(TRUNK)/clang++ \
+		-DCMAKE_C_COMPILER=$(CC) \
+		-DCMAKE_CXX_COMPILER=$(CXX) \
 		-DLLVM_ENABLE_PROJECTS="clang;lld" \
 		-DLLVM_USE_LINKER=lld \
 		-DCMAKE_INSTALL_PREFIX=$(PWD)/install.dir/baseline
 	cd build.dir/baseline && ninja install -j $(shell nproc)
 	touch .baseline
 
-.instrumented: .trunk 
+.instrumented: 
 	mkdir -p build.dir/instrumented
 	mkdir -p install.dir/instrumented
 	cd build.dir/instrumented && cmake -G Ninja $(LLVM) \
 		-DCMAKE_BUILD_TYPE=Release \
 		-DLLVM_TARGETS_TO_BUILD=X86 \
 		-DLLVM_OPTIMIZED_TABLEGEN=On \
-		-DCMAKE_C_COMPILER=$(TRUNK)/clang \
-		-DCMAKE_CXX_COMPILER=$(TRUNK)/clang++ \
+		-DCMAKE_C_COMPILER=$(CC) \
+		-DCMAKE_CXX_COMPILER=$(CXX) \
 		-DLLVM_ENABLE_PROJECTS="clang;lld" \
 		-DLLVM_USE_LINKER=lld \
 		-DLLVM_BUILD_INSTRUMENTED=ON \
@@ -42,8 +45,8 @@ LLVM = $(PWD)/benchmarks/clang/llvm-project-llvmorg-14.0.6/llvm
 		-DCMAKE_BUILD_TYPE=Release \
 		-DLLVM_TARGETS_TO_BUILD=X86 \
 		-DLLVM_OPTIMIZED_TABLEGEN=On \
-		-DCMAKE_C_COMPILER=$(TRUNK)/clang \
-		-DCMAKE_CXX_COMPILER=$(TRUNK)/clang++ \
+		-DCMAKE_C_COMPILER=$(CC) \
+		-DCMAKE_CXX_COMPILER=$(CXX) \
 		-DLLVM_ENABLE_PROJECTS="clang;lld" \
 		-DLLVM_USE_LINKER=lld \
 		-DLLVM_ENABLE_LTO=Thin  \
@@ -67,4 +70,4 @@ LLVM = $(PWD)/benchmarks/clang/llvm-project-llvmorg-14.0.6/llvm
 
 
 download-llvm:
-	cd benchmarks/clang && wget https://github.com/llvm/llvm-project/archive/refs/tags/llvmorg-14.0.6.zip && unzip llvmorg-14.0.6 && rm -f llvmorg-14.0.6.zip
+	wget https://github.com/llvm/llvm-project/archive/refs/tags/llvmorg-14.0.6.zip && unzip llvmorg-14.0.6 && rm -f llvmorg-14.0.6.zip

@@ -1,5 +1,6 @@
 
 #include <stdlib.h>
+#include <stdio.h>
 
 extern __attribute__((noinline)) size_t report(size_t a);
 

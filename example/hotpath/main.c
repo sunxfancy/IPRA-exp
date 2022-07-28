@@ -21,7 +21,7 @@ size_t func(size_t k) {
     size_t e = k+5;
 
     for (size_t i = 0; i < k; ++i) {
-        if (i == k-1 ) {
+        if (i == k-1) {
             report(a);
         } else {
             a += 1;
