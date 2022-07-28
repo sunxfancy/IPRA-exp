@@ -20,7 +20,9 @@ download/vorbis-tools:
 download/C_FFT:
 	cd build/benchmarks && wget https://github.com/sunxfancy/C_FFT/archive/refs/heads/master.zip && unzip ./master.zip && rm ./master.zip
 
-download/mysql-experiment:
+download/mysql-experiment: build/benchmarks/mysql-experiment
+
+build/benchmarks/mysql-experiment:
 	cd build/benchmarks && git clone git@github.com:sunxfancy/mysql-experiment.git
 	cd build/benchmarks/mysql-experiment/packages && wget https://dev.mysql.com/get/Downloads/MySQL-8.0/mysql-boost-8.0.30.tar.gz
 
@@ -32,7 +34,7 @@ define save_to_output
 	cat /tmp/count-push-pop.txt >> mysql.output 
 endef
 
-mysql: 
+mysql: download/mysql-experiment
 	rm -f mysql.output
 	$(call save_to_output,pgolto-mysql)
 	$(call save_to_output,pgolto-ipra-mysql)
