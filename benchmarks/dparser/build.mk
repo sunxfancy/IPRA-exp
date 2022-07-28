@@ -2,6 +2,13 @@ PWD := $(shell pwd)
 
 all: 
 
+common_compiler_flags := -fuse-ld=lld -fno-inline-functions
+common_linker_flags := -fuse-ld=lld
+
+gen_compiler_flags = -DCMAKE_C_FLAGS=$(1) -DCMAKE_CXX_FLAGS=$(1)
+gen_linker_flags   = -DCMAKE_EXE_LINKER_FLAGS=$(1) -DCMAKE_SHARED_LINKER_FLAGS=$(1) -DCMAKE_MODULE_LINKER_FLAGS=$(1)
+gen_build_flags = $(call gen_compiler_flags,"$(common_compiler_flags) $(1)") $(call gen_linker_flags,"$(common_linker_flags) $(2)")
+COMMA := ,
 
 build.dir/dparser.ipra:
 	mkdir -p build.dir/dparser.ipra
@@ -35,19 +42,15 @@ build.dir/dparser:
 
 
 dparser:
-	mkdir -p bench.dir/dparser
-	cd bench.dir/dparser && $(FDO) config ../../source.dir/dparser-master \
-		-DCMAKE_BUILD_TYPE=Release \
-		-DCMAKE_C_FLAGS="-fno-inline-functions" \
-		-DCMAKE_CXX_FLAGS="-fno-inline-functions"
-
-	cd bench.dir/dparser && $(FDO) build --lto=full -s ../../ipra/DParser.yaml --propeller
-	cd bench.dir/dparser && $(FDO) test  --propeller
-	cd bench.dir/dparser && $(CREATE_REG) --profile=labeled/Propeller0.data --binary=labeled/make_dparser > prof.txt
+	mkdir -p build.dir/dparser
+	$(FDO) config dparser-master -DCMAKE_BUILD_TYPE=Release 
+	$(FDO) build --lto=full -s ../../ipra/DParser.yaml --pgo
+	$(FDO) test  --propeller
+	$(CREATE_REG) --profile=labeled/Propeller0.data --binary=labeled/make_dparser > prof.txt
 
 dparser.ipra:
 	mkdir -p bench.dir/dparser.ipra
-	cd bench.dir/dparser.ipra && cmake ../../source.dir/dparser-master -G Ninja \
+	cd bench.dir/dparser.ipra && cmake dparser-master -G Ninja \
 	 	-DCMAKE_C_COMPILER=$(NCC) \
 		-DCMAKE_CXX_COMPILER=$(NCXX) \
 		-DCMAKE_C_FLAGS="-fno-inline-functions -flto=full -fuse-ld=lld" \

@@ -92,4 +92,5 @@ install/counter: counter/counter.go
 	cd counter && go build counter.go
 	mv counter/counter install/counter
 
-include $(wildcard */build.mk)
+include benchmarks/build.mk
+include example/build.mk

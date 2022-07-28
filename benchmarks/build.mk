@@ -24,28 +24,21 @@ download/mysql-experiment:
 	cd build/benchmarks && git clone git@github.com:sunxfancy/mysql-experiment.git
 	cd build/benchmarks/mysql-experiment/packages && wget https://dev.mysql.com/get/Downloads/MySQL-8.0/mysql-boost-8.0.30.tar.gz
 
+define save_to_output
+	echo "---------$(1)---------" >> mysql.output
+	rm -rf build/benchmarks/mysql-experiment/$(1)
+	rm -f /tmp/count-push-pop.txt 
+	cd build/benchmarks/mysql-experiment && make $(1)/install/bin/mysqld LLVM_INSTALL_BIN=$(PWD)/install/llvm/bin
+	cat /tmp/count-push-pop.txt >> mysql.output 
+endef
+
 mysql: 
 	rm -f mysql.output
-	echo "---------pgolto-mysql---------" >> mysql.output
-	rm -rf build/benchmarks/mysql-experiment/pgolto-mysql
-	rm -f /tmp/count-push-pop.txt 
-	cd build/benchmarks/mysql-experiment && make pgolto-mysql/install/bin/mysqld LLVM_INSTALL_BIN=$(PWD)/install/llvm/bin
-	cat /tmp/count-push-pop.txt >> mysql.output 
-	echo "---------pgolto-ipra-mysql---------" >> mysql.output
-	rm -rf build/benchmarks/mysql-experiment/pgolto-ipra-mysql
-	rm -f /tmp/count-push-pop.txt 
-	cd build/benchmarks/mysql-experiment && make pgolto-ipra-mysql/install/bin/mysqld LLVM_INSTALL_BIN=$(PWD)/install/llvm/bin
-	cat /tmp/count-push-pop.txt >> mysql.output 
-	echo "---------pgolto-full-ipra-mysql---------" >> mysql.output
-	rm -rf build/benchmarks/mysql-experiment/pgolto-full-ipra-mysql
-	rm -f /tmp/count-push-pop.txt 
-	cd build/benchmarks/mysql-experiment && make pgolto-full-ipra-mysql/install/bin/mysqld LLVM_INSTALL_BIN=$(PWD)/install/llvm/bin
-	cat /tmp/count-push-pop.txt >> mysql.output 
-	echo "---------pgolto-full-fdoipra-mysql---------" >> mysql.output
-	rm -rf build/benchmarks/mysql-experiment/pgolto-full-fdoipra-mysql
-	rm -f /tmp/count-push-pop.txt 
-	cd build/benchmarks/mysql-experiment && make pgolto-full-fdoipra-mysql/install/bin/mysqld LLVM_INSTALL_BIN=$(PWD)/install/llvm/bin
-	cat /tmp/count-push-pop.txt >> mysql.output 
+	$(call save_to_output,pgolto-mysql)
+	$(call save_to_output,pgolto-ipra-mysql)
+	$(call save_to_output,pgolto-full-ipra-mysql)
+	$(call save_to_output,pgolto-full-fdoipra-mysql)
+	$(call save_to_output,pgolto-full-ipra-fdoipra-mysql)
 	
 export
 
@@ -61,5 +54,3 @@ benchmarks/%:
 	mkdir -p build/$(dir $@)
 	echo $(dir $@)
 	$(MAKE) -C build/$(dir $@) -f $(PWD)/$(dir $@)build.mk $(notdir $@)
-
-include benchmarks/*/build.mk
