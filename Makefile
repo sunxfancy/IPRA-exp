@@ -4,9 +4,7 @@ LLVM_BUILD_TYPE=RelWithDebInfo
 PWD=$(shell pwd)
 FDO=install/FDO
 
-LLVM_TARGET = install/llvm/bin/clang-15
-AUTOFDO_TARGET = install/autofdo/create_llvm_prof
-
+LLVM_BIN = $(PWD)/install/llvm/bin
 
 CC = $(PWD)/install/llvm/bin/clang
 CXX = $(PWD)/install/llvm/bin/clang++
@@ -20,7 +18,7 @@ FDO = $(PWD)/install/FDO
 CREATE_REG = $(PWD)/install/autofdo/create_reg_prof
 
 .PHONY: build check-tools check-devlibs
-build: check-tools check-devlibs $(LLVM_TARGET) $(AUTOFDO_TARGET) install/FDO install/counter
+build: check-tools check-devlibs install/llvm install/autofdo install/FDO install/counter
 
 BUILD = build
 INSTALL = install
@@ -50,7 +48,7 @@ check-devlibs:
 	$(eval $(call lib-available,HAS_protobuf,protobuf-compiler))
 
 
-$(AUTOFDO_TARGET): build/autofdo/build.ninja
+install/autofdo: build/autofdo
 	mold -run cmake --build build/autofdo --config ${AUTOFDO_BUILD_TYPE} -j $(shell nproc) --target install
 	mkdir -p install/autofdo
 	cp build/autofdo/create_llvm_prof install/autofdo/create_llvm_prof
@@ -58,25 +56,24 @@ $(AUTOFDO_TARGET): build/autofdo/build.ninja
 	cp build/autofdo/profile_merger install/autofdo/profile_merger
 	cp build/autofdo/sample_merger install/autofdo/sample_merger
 
-build/autofdo/build.ninja: autofdo $(LLVM_TARGET)
+build/autofdo: autofdo install/llvm
 	mkdir -p build
 	cmake -G Ninja -B build/autofdo -S autofdo \
 		-DCMAKE_BUILD_TYPE=${AUTOFDO_BUILD_TYPE} \
 		-DLLVM_PATH=${PWD}/install/llvm \
 		-DCMAKE_INSTALL_PREFIX=build/autofdo 
 
-$(LLVM_TARGET): build/llvm/build.ninja
+install/llvm: build/llvm
 	mkdir -p install/llvm
 	mold -run cmake --build build/llvm --config ${LLVM_BUILD_TYPE} -j $(shell nproc) --target install
 	mold -run cmake --build build/llvm --config ${LLVM_BUILD_TYPE} -j $(shell nproc) --target install-profile
 
-build/llvm/build.ninja: LLVM-IPRA
+build/llvm: LLVM-IPRA
 	mkdir -p build
 	cmake -G Ninja -B build/llvm -S LLVM-IPRA/llvm \
 		-DCMAKE_BUILD_TYPE=${LLVM_BUILD_TYPE} \
 		-DLLVM_ENABLE_ASSERTIONS=ON \
 		-DBUILD_SHARED_LIBS=OFF \
-		-DLLVM_PARALLEL_LINK_JOBS=1 \
 		-DLLVM_INCLUDE_TESTS=OFF \
 		-DLLVM_BUILD_TESTS=OFF \
 		-DLLVM_OPTIMIZED_TABLEGEN=ON \

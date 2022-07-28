@@ -26,27 +26,27 @@ download/mysql-experiment:
 
 mysql: 
 	rm -f mysql.output
+	echo "---------pgolto-mysql---------" >> mysql.output
 	rm -rf build/benchmarks/mysql-experiment/pgolto-mysql
 	rm -f /tmp/count-push-pop.txt 
 	cd build/benchmarks/mysql-experiment && make pgolto-mysql/install/bin/mysqld LLVM_INSTALL_BIN=$(PWD)/install/llvm/bin
 	cat /tmp/count-push-pop.txt >> mysql.output 
-	echo "------------------" >> mysql.output
+	echo "---------pgolto-ipra-mysql---------" >> mysql.output
 	rm -rf build/benchmarks/mysql-experiment/pgolto-ipra-mysql
 	rm -f /tmp/count-push-pop.txt 
 	cd build/benchmarks/mysql-experiment && make pgolto-ipra-mysql/install/bin/mysqld LLVM_INSTALL_BIN=$(PWD)/install/llvm/bin
 	cat /tmp/count-push-pop.txt >> mysql.output 
-	echo "------------------" >> mysql.output
+	echo "---------pgolto-full-ipra-mysql---------" >> mysql.output
 	rm -rf build/benchmarks/mysql-experiment/pgolto-full-ipra-mysql
 	rm -f /tmp/count-push-pop.txt 
 	cd build/benchmarks/mysql-experiment && make pgolto-full-ipra-mysql/install/bin/mysqld LLVM_INSTALL_BIN=$(PWD)/install/llvm/bin
 	cat /tmp/count-push-pop.txt >> mysql.output 
+	echo "---------pgolto-full-fdoipra-mysql---------" >> mysql.output
 	rm -rf build/benchmarks/mysql-experiment/pgolto-full-fdoipra-mysql
 	rm -f /tmp/count-push-pop.txt 
-	cd build/benchmarks/mysql-experiment && make pgolto-full-fdoipra-mysql/install/bin/mysql LLVM_INSTALL_BIN=$(PWD)/install/llvm/bin
+	cd build/benchmarks/mysql-experiment && make pgolto-full-fdoipra-mysql/install/bin/mysqld LLVM_INSTALL_BIN=$(PWD)/install/llvm/bin
 	cat /tmp/count-push-pop.txt >> mysql.output 
-
-
-
+	
 export
 
 SUBDIRS := $(patsubst %/build.mk,%,$(wildcard benchmarks/*/build.mk))

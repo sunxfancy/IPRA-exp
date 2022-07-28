@@ -7,4 +7,4 @@
 /benchmarks/SNU-real-time
 /benchmarks/vorbis-tools-master
 .gdb_history
-
+*.output

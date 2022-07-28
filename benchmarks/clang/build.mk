@@ -1,73 +1,76 @@
 
 PWD := $(shell pwd)
 LLVM = $(PWD)/llvm-project-llvmorg-14.0.6/llvm
+INSTRUMENTED_PROF=$(PWD)/build.dir/instrumented/profiles
 
-# TODO: change this makefile to support clang test
+all: .instrumented .pgolto .pgolto-ipra .pgolto-full-ipra .pgolto-full-fdoipra .pgolto-full-ipra-fdoipra
 
-all: .baseline .instrumented .pgo-opt-clang
+common_compiler_flags := -fuse-ld=lld -fPIC
+common_linker_flags := -fuse-ld=lld
 
-.baseline: 
-	mkdir -p build.dir/baseline
-	mkdir -p install.dir/baseline
-	cd build.dir/baseline && cmake -G Ninja $(LLVM) \
+gen_compiler_flags = -DCMAKE_C_FLAGS=$(1) -DCMAKE_CXX_FLAGS=$(1)
+gen_linker_flags   = -DCMAKE_EXE_LINKER_FLAGS=$(1) -DCMAKE_SHARED_LINKER_FLAGS=$(1) -DCMAKE_MODULE_LINKER_FLAGS=$(1)
+gen_build_flags = $(call gen_compiler_flags,"$(common_compiler_flags) $(1)") $(call gen_linker_flags,"$(common_linker_flags) $(2)")
+COMMA := ,
+
+define build_clang
+    mkdir -p build.dir/$(1)
+	mkdir -p install.dir/$(1)
+	cd build.dir/$(1) && cmake -G Ninja $(LLVM) \
+		-DCMAKE_BUILD_TYPE=Release \
+		-DLLVM_OPTIMIZED_TABLEGEN=ON \
+		-DLLVM_TARGETS_TO_BUILD="X86" \
+		-DLLVM_ENABLE_RTTI=ON \
+		-DBUILD_SHARED_LIBS=OFF \
+		-DLLVM_INCLUDE_TESTS=OFF \
+		-DLLVM_BUILD_TESTS=OFF \
+		-DCMAKE_C_COMPILER=$(CC) \
+		-DCMAKE_CXX_COMPILER=$(CXX) \
+		-DLLVM_ENABLE_PROJECTS="clang;compiler-rt;lld" \
+		-DLLVM_USE_LINKER=lld \
+		-DCMAKE_INSTALL_PREFIX=$(PWD)/install.dir/$(1) \
+		$(2)
+	cd build.dir/$(1) && ninja install -j $(shell nproc)
+	touch .$(1)
+endef
+
+define clang_bench
+	mkdir -p build.dir/clangbench/$(1)
+	cd build.dir/clangbench/$(1) && cmake -G Ninja $(LLVM) \
 		-DCMAKE_BUILD_TYPE=Release \
 		-DLLVM_TARGETS_TO_BUILD=X86 \
 		-DLLVM_OPTIMIZED_TABLEGEN=On \
-		-DCMAKE_C_COMPILER=$(CC) \
-		-DCMAKE_CXX_COMPILER=$(CXX) \
-		-DLLVM_ENABLE_PROJECTS="clang;lld" \
-		-DLLVM_USE_LINKER=lld \
-		-DCMAKE_INSTALL_PREFIX=$(PWD)/install.dir/baseline
-	cd build.dir/baseline && ninja install -j $(shell nproc)
-	touch .baseline
+		-DCMAKE_C_COMPILER=$(2)/clang \
+		-DCMAKE_CXX_COMPILER=$(2)/clang++ \
+		-DLLVM_ENABLE_PROJECTS="clang" 
+	cd build.dir/clangbench/$(1) && (ninja -t commands | head -100 > $(PWD)/build.dir/clangbench/$(1)/perf_commands.sh)
+	cd build.dir/clangbench/$(1) && chmod +x ./perf_commands.sh
+endef 
+
 
 .instrumented: 
-	mkdir -p build.dir/instrumented
-	mkdir -p install.dir/instrumented
-	cd build.dir/instrumented && cmake -G Ninja $(LLVM) \
-		-DCMAKE_BUILD_TYPE=Release \
-		-DLLVM_TARGETS_TO_BUILD=X86 \
-		-DLLVM_OPTIMIZED_TABLEGEN=On \
-		-DCMAKE_C_COMPILER=$(CC) \
-		-DCMAKE_CXX_COMPILER=$(CXX) \
-		-DLLVM_ENABLE_PROJECTS="clang;lld" \
-		-DLLVM_USE_LINKER=lld \
-		-DLLVM_BUILD_INSTRUMENTED=ON \
-		-DCMAKE_INSTALL_PREFIX=$(PWD)/install.dir/instrumented
-	cd build.dir/instrumented && ninja install -j $(shell nproc)
-	touch .instrumented
+	$(call build_clang,instrumented,-DLLVM_BUILD_INSTRUMENTED=ON)
+
+.pgolto:  $(INSTRUMENTED_PROF)/clang.profdata
+	$(call build_clang,pgolto,-DLLVM_ENABLE_LTO=Thin -DLLVM_PROFDATA_FILE=$(INSTRUMENTED_PROF)/clang.profdata)
+
+.pgolto-ipra: 
+	$(call build_clang,pgolto-ipra,-DLLVM_ENABLE_LTO=Thin $(call gen_build_flags,,-Wl$(COMMA)-mllvm -Wl$(COMMA)-enable-ipra,-Wl$(COMMA)-Bsymbolic-non-weak-functions) -DLLVM_PROFDATA_FILE=$(INSTRUMENTED_PROF)/clang.profdata)
+
+.pgolto-full-ipra:
+	$(call build_clang,pgolto-full-ipra,-DLLVM_ENABLE_LTO=Full $(call gen_build_flags,,-Wl$(COMMA)-mllvm -Wl$(COMMA)-enable-ipra,-Wl$(COMMA)-Bsymbolic-non-weak-functions) -DLLVM_PROFDATA_FILE=$(INSTRUMENTED_PROF)/clang.profdata)
+
+.pgolto-full-fdoipra:
+	$(call build_clang,pgolto-full-fdoipra,-DLLVM_ENABLE_LTO=Full $(call gen_build_flags,,-Wl$(COMMA)-mllvm -Wl$(COMMA)-fdo-ipra,-Wl$(COMMA)-Bsymbolic-non-weak-functions) -DLLVM_PROFDATA_FILE=$(INSTRUMENTED_PROF)/clang.profdata)
+
+.pgolto-full-ipra-fdoipra:
+	$(call build_clang,pgolto-full-ipra-fdoipra,-DLLVM_ENABLE_LTO=Full $(call gen_build_flags,,-Wl$(COMMA)-mllvm -Wl$(COMMA)-fdo-ipra -Wl$(COMMA)-mllvm -Wl$(COMMA)-enable-ipra,-Wl$(COMMA)-Bsymbolic-non-weak-functions) -DLLVM_PROFDAT_FILE=$(INSTRUMENTED_PROF)/clang.profdata)
 
 
-.pgo-opt-clang:
-	mkdir -p build.dir/pgo-opt-clang
-	mkdir -p install.dir/pgo-opt-clang
-	cd build.dir/pgo-opt-clang && cmake -G Ninja $(LLVM) \
-		-DCMAKE_BUILD_TYPE=Release \
-		-DLLVM_TARGETS_TO_BUILD=X86 \
-		-DLLVM_OPTIMIZED_TABLEGEN=On \
-		-DCMAKE_C_COMPILER=$(CC) \
-		-DCMAKE_CXX_COMPILER=$(CXX) \
-		-DLLVM_ENABLE_PROJECTS="clang;lld" \
-		-DLLVM_USE_LINKER=lld \
-		-DLLVM_ENABLE_LTO=Thin  \
-		-DLLVM_PROFDATA_FILE=$(INSTRUMENTED_PROF)/clang.profdata \
-		-DCMAKE_INSTALL_PREFIX=$(PWD)/install.dir/pgo-opt-clang
-	cd build.dir/pgo-opt-clang && ninja install -j $(shell nproc)
-	touch .pgo-opt-clang
-
-
-%.clangbench:
-	mkdir -p build/clangbench/$(basename $@)
-	cd build/clangbench/$(basename $@) && cmake -G Ninja $(LLVM) \
-		-DCMAKE_BUILD_TYPE=Release \
-		-DLLVM_TARGETS_TO_BUILD=X86 \
-		-DLLVM_OPTIMIZED_TABLEGEN=On \
-		-DCMAKE_C_COMPILER=$(PWD)/build/clangbench/$(basename $@)/install/bin/clang \
-		-DCMAKE_CXX_COMPILER=$(PWD)/build/clangbench/$(basename $@)/install/bin/clang++ \
-		-DLLVM_ENABLE_PROJECTS="clang" 
-	cd build/clangbench/$(basename $@) && (ninja -t commands | head -100 > $(PWD)/build/clangbench/$(basename $@)/perf_commands.sh)
-	cd build/clangbench/$(basename $@) && chmod +x ./perf_commands.sh
-
+$(INSTRUMENTED_PROF)/clang.profdata:  .instrumented
+	$(call clang_bench,instrumented,$(PWD)/install.dir/instrumented/bin)
+	cd build.dir/clangbench/instrumented && ./perf_commands.sh
+	cd $(INSTRUMENTED_PROF) && $(LLVM_BIN)/llvm-profdata merge -output=clang.profdata *
 
 download-llvm:
 	wget https://github.com/llvm/llvm-project/archive/refs/tags/llvmorg-14.0.6.zip && unzip llvmorg-14.0.6 && rm -f llvmorg-14.0.6.zip
