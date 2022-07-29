@@ -3,10 +3,10 @@ PWD := $(shell pwd)
 LLVM = $(PWD)/llvm-project-llvmorg-14.0.6/llvm
 INSTRUMENTED_PROF=$(PWD)/build.dir/instrumented/profiles
 
-all: .instrumented .pgolto .pgolto-ipra .pgolto-full-ipra .pgolto-full-fdoipra .pgolto-full-ipra-fdoipra
+all: .instrumented .pgolto .pgolto-full .pgolto-ipra .pgolto-full-ipra .pgolto-full-fdoipra .pgolto-full-ipra-fdoipra
 
 common_compiler_flags := -fuse-ld=lld -fPIC -mllvm -count-push-pop
-common_linker_flags := -fuse-ld=lld -mllvm -count-push-pop
+common_linker_flags := -fuse-ld=lld -Wl,-mllvm -Wl,-count-push-pop
 
 gen_compiler_flags = -DCMAKE_C_FLAGS=$(1) -DCMAKE_CXX_FLAGS=$(1)
 gen_linker_flags   = -DCMAKE_EXE_LINKER_FLAGS=$(1) -DCMAKE_SHARED_LINKER_FLAGS=$(1) -DCMAKE_MODULE_LINKER_FLAGS=$(1)
@@ -54,22 +54,25 @@ clear-clang-output:
 	rm -f clang.output 
 
 .instrumented: clear-clang-output llvm-project-llvmorg-14.0.6
-	$(call build_clang,instrumented,-DLLVM_BUILD_INSTRUMENTED=ON)
+	$(call build_clang,instrumented,-DLLVM_BUILD_INSTRUMENTED=ON $(call gen_build_flags,,))
 
 .pgolto: clear-clang-output $(INSTRUMENTED_PROF)/clang.profdata
-	$(call build_clang,pgolto,-DLLVM_ENABLE_LTO=Thin -DLLVM_PROFDATA_FILE=$(INSTRUMENTED_PROF)/clang.profdata)
+	$(call build_clang,pgolto,-DLLVM_ENABLE_LTO=Thin $(call gen_build_flags,,) -DLLVM_PROFDATA_FILE=$(INSTRUMENTED_PROF)/clang.profdata)
 
 .pgolto-ipra: clear-clang-output $(INSTRUMENTED_PROF)/clang.profdata
-	$(call build_clang,pgolto-ipra,-DLLVM_ENABLE_LTO=Thin $(call gen_build_flags,,-Wl$(COMMA)-mllvm -Wl$(COMMA)-enable-ipra,-Wl$(COMMA)-Bsymbolic-non-weak-functions) -DLLVM_PROFDATA_FILE=$(INSTRUMENTED_PROF)/clang.profdata)
+	$(call build_clang,pgolto-ipra,-DLLVM_ENABLE_LTO=Thin $(call gen_build_flags,,-Wl$(COMMA)-mllvm -Wl$(COMMA)-enable-ipra -Wl$(COMMA)-Bsymbolic-non-weak-functions) -DLLVM_PROFDATA_FILE=$(INSTRUMENTED_PROF)/clang.profdata)
 
 .pgolto-full-ipra: clear-clang-output $(INSTRUMENTED_PROF)/clang.profdata
-	$(call build_clang,pgolto-full-ipra,-DLLVM_ENABLE_LTO=Full $(call gen_build_flags,,-Wl$(COMMA)-mllvm -Wl$(COMMA)-enable-ipra,-Wl$(COMMA)-Bsymbolic-non-weak-functions) -DLLVM_PROFDATA_FILE=$(INSTRUMENTED_PROF)/clang.profdata)
+	$(call build_clang,pgolto-full-ipra,-DLLVM_ENABLE_LTO=Full $(call gen_build_flags,,-Wl$(COMMA)-mllvm -Wl$(COMMA)-enable-ipra -Wl$(COMMA)-Bsymbolic-non-weak-functions) -DLLVM_PROFDATA_FILE=$(INSTRUMENTED_PROF)/clang.profdata)
+
+.pgolto-full: clear-clang-output $(INSTRUMENTED_PROF)/clang.profdata
+	$(call build_clang,pgolto-full,-DLLVM_ENABLE_LTO=Full $(call gen_build_flags,,-Wl$(COMMA)-Bsymbolic-non-weak-functions) -DLLVM_PROFDATA_FILE=$(INSTRUMENTED_PROF)/clang.profdata)
 
 .pgolto-full-fdoipra: clear-clang-output $(INSTRUMENTED_PROF)/clang.profdata
-	$(call build_clang,pgolto-full-fdoipra,-DLLVM_ENABLE_LTO=Full $(call gen_build_flags,,-Wl$(COMMA)-mllvm -Wl$(COMMA)-fdo-ipra,-Wl$(COMMA)-Bsymbolic-non-weak-functions) -DLLVM_PROFDATA_FILE=$(INSTRUMENTED_PROF)/clang.profdata)
+	$(call build_clang,pgolto-full-fdoipra,-DLLVM_ENABLE_LTO=Full $(call gen_build_flags,,-Wl$(COMMA)-mllvm -Wl$(COMMA)-fdo-ipra -Wl$(COMMA)-Bsymbolic-non-weak-functions) -DLLVM_PROFDATA_FILE=$(INSTRUMENTED_PROF)/clang.profdata)
 
 .pgolto-full-ipra-fdoipra: clear-clang-output $(INSTRUMENTED_PROF)/clang.profdata
-	$(call build_clang,pgolto-full-ipra-fdoipra,-DLLVM_ENABLE_LTO=Full $(call gen_build_flags,,-Wl$(COMMA)-mllvm -Wl$(COMMA)-fdo-ipra -Wl$(COMMA)-mllvm -Wl$(COMMA)-enable-ipra,-Wl$(COMMA)-Bsymbolic-non-weak-functions) -DLLVM_PROFDAT_FILE=$(INSTRUMENTED_PROF)/clang.profdata)
+	$(call build_clang,pgolto-full-ipra-fdoipra,-DLLVM_ENABLE_LTO=Full $(call gen_build_flags,,-Wl$(COMMA)-mllvm -Wl$(COMMA)-fdo-ipra -Wl$(COMMA)-mllvm -Wl$(COMMA)-enable-ipra -Wl$(COMMA)-Bsymbolic-non-weak-functions) -DLLVM_PROFDAT_FILE=$(INSTRUMENTED_PROF)/clang.profdata)
 
 
 $(INSTRUMENTED_PROF)/clang.profdata:  .instrumented
