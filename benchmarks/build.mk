@@ -1,6 +1,7 @@
 
+benchmarks: benchmarks/mysql benchmarks/clang
 
-DonwloadTargets = download/snubench download/dparser download/vorbis-tools download/C_FFT download/mysql-experiment
+DonwloadTargets = download/snubench download/dparser download/vorbis-tools download/C_FFT 
 
 build-benchmarks-dir:
 	mkdir -p build/benchmarks
@@ -20,22 +21,21 @@ download/vorbis-tools:
 download/C_FFT:
 	cd build/benchmarks && wget https://github.com/sunxfancy/C_FFT/archive/refs/heads/master.zip && unzip ./master.zip && rm ./master.zip
 
-download/mysql-experiment: build/benchmarks/mysql-experiment
 
-build/benchmarks/mysql-experiment:
+build/benchmarks/mysql-experiment/packages/mysql-boost-8.0.30.tar.gz:
 	cd build/benchmarks && git clone git@github.com:sunxfancy/mysql-experiment.git
 	cd build/benchmarks/mysql-experiment/packages && wget https://dev.mysql.com/get/Downloads/MySQL-8.0/mysql-boost-8.0.30.tar.gz
 
 define save_to_output
-	echo "---------$(1)---------" >> mysql.output
 	rm -rf build/benchmarks/mysql-experiment/$(1)
 	rm -f /tmp/count-push-pop.txt 
 	cd build/benchmarks/mysql-experiment && make $(1)/install/bin/mysqld LLVM_INSTALL_BIN=$(PWD)/install/llvm/bin
-	cat /tmp/count-push-pop.txt >> mysql.output 
+	echo "---------$(1)---------" >> build/benchmarks/mysql.output
+	cat /tmp/count-push-pop.txt >> build/benchmarks/mysql.output 
 endef
 
-mysql: download/mysql-experiment
-	rm -f mysql.output
+benchmarks/mysql: build/benchmarks/mysql-experiment/packages/mysql-boost-8.0.30.tar.gz
+	rm -f build/benchmarks/mysql.output
 	$(call save_to_output,pgolto-mysql)
 	$(call save_to_output,pgolto-ipra-mysql)
 	$(call save_to_output,pgolto-full-ipra-mysql)
