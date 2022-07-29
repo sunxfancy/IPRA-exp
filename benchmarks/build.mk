@@ -23,6 +23,7 @@ download/C_FFT:
 
 
 build/benchmarks/mysql-experiment/packages/mysql-boost-8.0.30.tar.gz:
+	mkdir -p build/benchmarks
 	cd build/benchmarks && git clone git@github.com:sunxfancy/mysql-experiment.git
 	cd build/benchmarks/mysql-experiment/packages && wget https://dev.mysql.com/get/Downloads/MySQL-8.0/mysql-boost-8.0.30.tar.gz
 
