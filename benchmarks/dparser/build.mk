@@ -1,62 +1,43 @@
 PWD := $(shell pwd)
+mkfile_path := $(dir $(lastword $(MAKEFILE_LIST)))
+current_dir := $(notdir $(patsubst %/,%,$(dir $(mkfile_path))))
+
 
 all: 
 
-common_compiler_flags := -fuse-ld=lld -fno-inline-functions
-common_linker_flags := -fuse-ld=lld
+common_compiler_flags := -fuse-ld=lld -fno-inline-functions -mllvm -count-push-pop
+common_linker_flags := -fuse-ld=lld -Wl,-fno-inline-functions -Wl,-mllvm -Wl,-count-push-pop
 
 gen_compiler_flags = -DCMAKE_C_FLAGS=$(1) -DCMAKE_CXX_FLAGS=$(1)
 gen_linker_flags   = -DCMAKE_EXE_LINKER_FLAGS=$(1) -DCMAKE_SHARED_LINKER_FLAGS=$(1) -DCMAKE_MODULE_LINKER_FLAGS=$(1)
 gen_build_flags = $(call gen_compiler_flags,"$(common_compiler_flags) $(1)") $(call gen_linker_flags,"$(common_linker_flags) $(2)")
 COMMA := ,
 
-build.dir/dparser.ipra:
-	mkdir -p build.dir/dparser.ipra
-	cd build.dir/dparser.ipra && cmake ../../source.dir/dparser-master -G Ninja \
-	 	-DCMAKE_C_COMPILER=$(NCC) \
-		-DCMAKE_CXX_COMPILER=$(NCXX) \
-		-DCMAKE_C_FLAGS="-fno-inline-functions -flto=full -fuse-ld=lld" \
-		-DCMAKE_CXX_FLAGS="-fno-inline-functions -flto=full -fuse-ld=lld" \
-		-DCMAKE_EXE_LINKER_FLAGS="-flto=full  -fuse-ld=lld -Wl,-mllvm -Wl,-enable-ipra" \
-		-DCMAKE_SHARED_LINKER_FLAGS="-flto=full  -fuse-ld=lld -Wl,-mllvm -Wl,-enable-ipra" \
-		-DCMAKE_MODULE_LINKER_FLAGS="-flto=full  -fuse-ld=lld -Wl,-mllvm -Wl,-enable-ipra" \
-		-DCMAKE_BUILD_TYPE=Release \
-		-DCMAKE_INSTALL_PREFIX=../../install.dir/dparser.ipra
-	cd build.dir/dparser.ipra && ninja install
 
+define build
+	rm -f /tmp/count-push-pop.txt 
+	$(FDO) opt --pgo $(2)
+	echo "---------$(1)---------" >> dparser.output
+	cat /tmp/count-push-pop.txt >> dparser.output 
+	touch .$(1)
+endef
 
-build.dir/dparser:
+.instrumented: dparser-master
 	mkdir -p build.dir/dparser
-	cd build.dir/dparser && cmake ../../source.dir/dparser-master -G Ninja \
-	 	-DCMAKE_C_COMPILER=$(NCC) \
-		-DCMAKE_CXX_COMPILER=$(NCXX) \
-		-DCMAKE_C_FLAGS="-fno-inline-functions -flto=full -fuse-ld=lld" \
-		-DCMAKE_CXX_FLAGS="-fno-inline-functions -flto=full -fuse-ld=lld" \
-		-DCMAKE_EXE_LINKER_FLAGS="-flto=full  -fuse-ld=lld" \
-		-DCMAKE_SHARED_LINKER_FLAGS="-flto=full  -fuse-ld=lld" \
-		-DCMAKE_MODULE_LINKER_FLAGS="-flto=full  -fuse-ld=lld" \
-		-DCMAKE_BUILD_TYPE=Release \
-		-DCMAKE_INSTALL_PREFIX=../../install.dir/dparser
-	cd build.dir/dparser && ninja install
+	$(FDO) config dparser-master -DCMAKE_BUILD_TYPE=Release
 
+	$(FDO) build --lto=full -s $(mkfile_path)DParser.yaml --pgo
+	$(FDO) test  --pgo
+	touch .instrumented
 
+.pgolto: .instrumented
+	$(call build,pgolto,$(gen_build_flags,,))
 
-dparser:
-	mkdir -p build.dir/dparser
-	$(FDO) config dparser-master -DCMAKE_BUILD_TYPE=Release 
-	$(FDO) build --lto=full -s ../../ipra/DParser.yaml --pgo
-	$(FDO) test  --propeller
-	$(CREATE_REG) --profile=labeled/Propeller0.data --binary=labeled/make_dparser > prof.txt
+.pgolto-ipra: .instrumented
+	$(call build,pgolto,$(gen_build_flags,,-Wl$(COMMA)-mllvm -Wl$(COMMA)-enable-ipra -Wl$(COMMA)-Bsymbolic-non-weak-functions))
 
-dparser.ipra:
-	mkdir -p bench.dir/dparser.ipra
-	cd bench.dir/dparser.ipra && cmake dparser-master -G Ninja \
-	 	-DCMAKE_C_COMPILER=$(NCC) \
-		-DCMAKE_CXX_COMPILER=$(NCXX) \
-		-DCMAKE_C_FLAGS="-fno-inline-functions -flto=full -fuse-ld=lld" \
-		-DCMAKE_CXX_FLAGS="-fno-inline-functions -flto=full -fuse-ld=lld" \
-		-DCMAKE_EXE_LINKER_FLAGS="-flto=full  -fuse-ld=lld -Wl,-mllvm -Wl,-enable-ipra -Wl,-mllvm -Wl,-ipra-profile=../dparser/prof.txt" \
-		-DCMAKE_SHARED_LINKER_FLAGS="-flto=full  -fuse-ld=lld -Wl,-mllvm -Wl,-enable-ipra -Wl,-mllvm -Wl,-ipra-profile=../dparser/prof.txt" \
-		-DCMAKE_MODULE_LINKER_FLAGS="-flto=full  -fuse-ld=lld -Wl,-mllvm -Wl,-enable-ipra -Wl,-mllvm -Wl,-ipra-profile=../dparser/prof.txt" \
-		-DCMAKE_BUILD_TYPE=Release \
-	cd bench.dir/dparser.ipra && ninja 
+.pgolto-fdoipra: .instrumented
+	$(call build,pgolto,$(gen_build_flags,,-Wl$(COMMA)-mllvm -Wl$(COMMA)-fdo-ipra -Wl$(COMMA)-Bsymbolic-non-weak-functions))
+
+dparser-master:
+	wget https://github.com/jplevyak/dparser/archive/refs/heads/master.zip && unzip ./master.zip && rm ./master.zip

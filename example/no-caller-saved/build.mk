@@ -24,3 +24,5 @@ FDO-example4:
 		$(FDO) test --pgo && \
 		$(FDO) opt --pgo
 
+main3:
+	$(NCC) -O3 -S $(mkfile_path)main3.c -o main3.S

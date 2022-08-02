@@ -1,0 +1,8 @@
+layout asm
+b InitListChecker::CheckListElementTypes
+b InitListChecker::CheckStructUnionTypes
+run
+b _ZNK5clang10RecordDecl11field_beginEv
+c
+
+

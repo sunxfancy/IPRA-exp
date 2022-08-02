@@ -1,0 +1,6 @@
+layout asm
+b MatcherTableEmitter::EmitMatcher
+run
+c 2001
+b llvm::raw_ostream::flush_nonempty
+c
