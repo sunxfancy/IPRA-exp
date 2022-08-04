@@ -5,16 +5,19 @@ INSTRUMENTED_PROF=$(PWD)/build.dir/instrumented/profiles
 
 all: .instrumented .pgolto .pgolto-full .pgolto-ipra .pgolto-full-ipra .pgolto-full-fdoipra .pgolto-full-ipra-fdoipra
 
-common_compiler_flags := -fuse-ld=lld -fPIC -mllvm -count-push-pop
-common_linker_flags := -fuse-ld=lld -Wl,-mllvm -Wl,-count-push-pop
+common_compiler_flags := -fuse-ld=lld -fPIC
+common_linker_flags := -fuse-ld=lld
 
 gen_compiler_flags = -DCMAKE_C_FLAGS=$(1) -DCMAKE_CXX_FLAGS=$(1)
 gen_linker_flags   = -DCMAKE_EXE_LINKER_FLAGS=$(1) -DCMAKE_SHARED_LINKER_FLAGS=$(1) -DCMAKE_MODULE_LINKER_FLAGS=$(1)
 gen_build_flags = $(call gen_compiler_flags,"$(common_compiler_flags) $(1)") $(call gen_linker_flags,"$(common_linker_flags) $(2)")
 COMMA := ,
 
+# -DLLVM_PARALLEL_LINK_JOBS=1 \
+
 define build_clang
 	rm -f /tmp/count-push-pop.txt 
+	touch /tmp/count-push-pop.txt
     mkdir -p build.dir/$(1)
 	mkdir -p install.dir/$(1)
 	cd build.dir/$(1) && cmake -G Ninja $(LLVM) \
@@ -31,9 +34,9 @@ define build_clang
 		-DLLVM_USE_LINKER=lld \
 		-DCMAKE_INSTALL_PREFIX=$(PWD)/install.dir/$(1) \
 		$(2)
-	cd build.dir/$(1) && ninja install -j $(shell nproc) -v > build.log
-	echo "---------$(1)---------" >> clang.output
-	cat /tmp/count-push-pop.txt >> clang.output 
+	cd build.dir/$(1) && CLANG_PROXY_FOCUS=clang-14 CLANG_PROXY_ARGS="-Wl,-mllvm -Wl,-count-push-pop" time -o time.log ninja install -j $(shell nproc) -v > build.log
+	echo "---------$(1)---------" >> ../clang.output
+	cat /tmp/count-push-pop.txt >> ../clang.output 
 	touch .$(1)
 endef
 
@@ -81,6 +84,9 @@ $(INSTRUMENTED_PROF)/clang.profdata:  .instrumented
 	$(call clang_bench,instrumented,$(PWD)/install.dir/instrumented/bin)
 	cd build.dir/clangbench/instrumented && ./perf_commands.sh
 	cd $(INSTRUMENTED_PROF) && $(LLVM_BIN)/llvm-profdata merge -output=clang.profdata *
+
+%.bench: .% 
+	$(call clang_bench,$(basename $@),$(PWD)/install.dir/$(basename $@)/bin)
 
 llvm-project-llvmorg-14.0.6:
 	wget https://github.com/llvm/llvm-project/archive/refs/tags/llvmorg-14.0.6.zip && unzip llvmorg-14.0.6 && rm -f llvmorg-14.0.6.zip

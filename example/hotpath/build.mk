@@ -1,11 +1,5 @@
 mkfile_path := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
 
-FDO-example:
-	$(FDO) config $(mkfile_path) -DCMAKE_BUILD_TYPE=Release && \
-		$(FDO) build --pgo && \
-		$(FDO) test --pgo && \
-		$(FDO) opt --pgo
-
 example: FDO-example
 	mkdir -p build/example 
 	rm -f /tmp/count-push-pop.txt
@@ -21,6 +15,13 @@ example: FDO-example
 	$(NCC) -O3 -S $(ENABLE_COUNT_PUSH_POP) -fprofile-use=instrumented/PGO.profdata $(mkfile_path)main2.c -o no_ipra_pgo2.S
 	$(NCC) -O3 -S $(ENABLE_COUNT_PUSH_POP) $(ENABLE_IPRA) -fprofile-use=instrumented/PGO.profdata $(mkfile_path)main2.c -o ipra_pgo2.S
 	cat /tmp/count-push-pop.txt 
+
+
+FDO-example:
+	$(FDO) config $(mkfile_path) -DCMAKE_BUILD_TYPE=Release && \
+		$(FDO) build --pgo && \
+		$(FDO) test --pgo && \
+		$(FDO) opt --pgo
 
 ENABLE_FDO_IPRA = -mllvm -fdo-ipra
 

@@ -1,13 +1,13 @@
 AUTOFDO_BUILD_TYPE=Release
-LLVM_BUILD_TYPE=RelWithDebInfo
+LLVM_BUILD_TYPE=Release
 
 PWD=$(shell pwd)
 FDO=install/FDO
 
 LLVM_BIN = $(PWD)/install/llvm/bin
 
-NCC = $(PWD)/install/llvm/bin/clang
-NCXX = $(PWD)/install/llvm/bin/clang++
+NCC = $(PWD)/install/llvm/bin/clang-proxy
+NCXX = $(PWD)/install/llvm/bin/clang-proxy++
 ENABLE_IPRA =  -mllvm -enable-ipra
 ENABLE_IPRA_LTO = -Wl,-mllvm -Wl,-enable-ipra
 ENABLE_COUNT_PUSH_POP = -mllvm -count-push-pop 
@@ -18,7 +18,7 @@ FDO = $(PWD)/install/FDO
 CREATE_REG = $(PWD)/install/autofdo/create_reg_prof
 
 .PHONY: build check-tools check-devlibs
-build: check-tools check-devlibs install/llvm install/autofdo install/FDO install/counter
+build: check-tools check-devlibs install/llvm install/autofdo install/FDO install/counter install/clang-proxy
 
 BUILD = build
 INSTALL = install
@@ -87,10 +87,17 @@ install/FDO: FDO
 	cd FDO && go build .
 	mv FDO/FDO install/FDO
 
-install/counter: counter/counter.go
+install/counter: utils/counter.go
 	mkdir -p install
-	cd counter && go build counter.go
-	mv counter/counter install/counter
+	cd utils && go build counter.go
+	mv utils/counter install/counter
+
+install/clang-proxy: utils/clang-proxy.go build/llvm
+	mkdir -p install
+	cd utils && go build clang-proxy.go
+	mv utils/clang-proxy install/llvm/bin/clang-proxy
+	rm -f install/llvm/bin/clang-proxy++ 
+	ln -s ./clang-proxy install/llvm/bin/clang-proxy++
 
 include benchmarks/build.mk
 include example/build.mk
