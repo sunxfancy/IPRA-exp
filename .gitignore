@@ -6,6 +6,8 @@
 /benchmarks/mysql-experiment
 /benchmarks/SNU-real-time
 /benchmarks/vorbis-tools-master
-/reproduce-bug/
+/reproduce-bug/build
+/reproduce-bug/install
+/reproduce-bug/llvm-project-main
 .gdb_history
 *.output

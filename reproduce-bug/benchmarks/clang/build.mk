@@ -5,7 +5,7 @@ CLANG_VERSION=llvmorg-14.0.6
 LLVM = $(PWD)/llvm-project-$(CLANG_VERSION)/llvm
 INSTRUMENTED_PROF=$(PWD)/build.dir/instrumented/profiles
 
-all: .instrumented .pgolto .pgolto-full .pgolto-ipra .pgolto-full-ipra .pgolto-full-fdoipra .pgolto-full-ipra-fdoipra pgolto-full.bench pgolto-full-ipra.bench pgolto-full-fdoipra.bench
+all: .instrumented .pgolto .pgolto-full .pgolto-ipra .pgolto-full-ipra pgolto-full.bench pgolto-full-ipra.bench 
 
 common_compiler_flags := -fuse-ld=lld -fPIC -fno-inline
 common_linker_flags := -fuse-ld=lld -fno-inline
@@ -19,7 +19,7 @@ COMMA := ,
 define build_clang
 	rm -f /tmp/count-push-pop.txt 
 	touch /tmp/count-push-pop.txt
-	mkdir -p build.dir/$(1)
+    mkdir -p build.dir/$(1)
 	mkdir -p install.dir/$(1)
 	cd build.dir/$(1) && cmake -G Ninja $(LLVM) \
 		-DCMAKE_BUILD_TYPE=Release \
@@ -35,7 +35,7 @@ define build_clang
 		-DLLVM_USE_LINKER=lld \
 		-DCMAKE_INSTALL_PREFIX=$(PWD)/install.dir/$(1) \
 		$(2)
-	cd build.dir/$(1) && CLANG_PROXY_FOCUS=clang-14 CLANG_PROXY_ARGS="-Wl,-mllvm -Wl,-count-push-pop" time -o time.log ninja install -j $(shell nproc) -v > build.log
+	cd build.dir/$(1) && time -o time.log ninja install -j $(shell nproc) -v > build.log
 	echo "---------$(1)---------" >> ../clang.output
 	cat /tmp/count-push-pop.txt >> ../clang.output 
 	touch .$(1)
@@ -53,8 +53,6 @@ define clang_bench
 	cd build.dir/clangbench/$(1) && (ninja -t commands | head -100 > $(PWD)/build.dir/clangbench/$(1)/perf_commands.sh)
 	cd build.dir/clangbench/$(1) && chmod +x ./perf_commands.sh
 endef 
-
-
 
 .instrumented: llvm-project-$(CLANG_VERSION)
 	$(call build_clang,instrumented,-DLLVM_BUILD_INSTRUMENTED=ON $(call gen_build_flags,,))
