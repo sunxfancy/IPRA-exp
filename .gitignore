@@ -6,5 +6,6 @@
 /benchmarks/mysql-experiment
 /benchmarks/SNU-real-time
 /benchmarks/vorbis-tools-master
+/reproduce-bug/
 .gdb_history
 *.output

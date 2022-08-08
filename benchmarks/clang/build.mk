@@ -7,8 +7,8 @@ INSTRUMENTED_PROF=$(PWD)/build.dir/instrumented/profiles
 
 all: .instrumented .pgolto .pgolto-full .pgolto-ipra .pgolto-full-ipra .pgolto-full-fdoipra .pgolto-full-ipra-fdoipra pgolto-full.bench pgolto-full-ipra.bench pgolto-full-fdoipra.bench
 
-common_compiler_flags := -fuse-ld=lld -fPIC
-common_linker_flags := -fuse-ld=lld 
+common_compiler_flags := -fuse-ld=lld -fPIC -fno-inline
+common_linker_flags := -fuse-ld=lld -fno-inline
 
 gen_compiler_flags = -DCMAKE_C_FLAGS=$(1) -DCMAKE_CXX_FLAGS=$(1)
 gen_linker_flags   = -DCMAKE_EXE_LINKER_FLAGS=$(1) -DCMAKE_SHARED_LINKER_FLAGS=$(1) -DCMAKE_MODULE_LINKER_FLAGS=$(1)
