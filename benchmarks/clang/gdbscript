@@ -1,0 +1,6 @@
+layout asm
+b llvm::SmallVectorTemplateBase<clang::FixItHint, false>::push_back(clang::FixItHint const&)
+r
+c 44
+b *(_Znwm+35)
+

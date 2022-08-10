@@ -1,8 +1,4 @@
 layout asm
-b InitListChecker::CheckListElementTypes
-b InitListChecker::CheckStructUnionTypes
-run
-b _ZNK5clang10RecordDecl11field_beginEv
-c
-
+b clang::Sema::InstantiatingTemplate::InstantiatingTemplate(clang::Sema&, clang::Sema::CodeSynthesisContext::SynthesisKind, clang::SourceLocation, clang::SourceRange, clang::Decl*, clang::NamedDecl*, llvm::ArrayRef<clang::TemplateArgument>, clang::sema::TemplateDeductionInfo*)
+r
 
