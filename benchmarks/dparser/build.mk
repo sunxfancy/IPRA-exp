@@ -18,7 +18,7 @@ define build
 	rm -f /tmp/count-push-pop.txt 
 	$(FDO) opt --pgo $(2)
 	echo "---------$(1)---------" >> dparser.output
-	cat /tmp/count-push-pop.txt >> dparser.output 
+	cat /tmp/count-push-pop.txt | $(COUNTSUM) >> dparser.output 
 	touch .$(1)
 endef
 

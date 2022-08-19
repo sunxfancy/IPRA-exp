@@ -36,7 +36,7 @@ define save_to_output
 	rm -f /tmp/count-push-pop.txt 
 	cd build/benchmarks/mysql-experiment && make $(1)/install/bin/mysqld LLVM_INSTALL_BIN=$(PWD)/install/llvm/bin
 	echo "---------$(1)---------" >> build/benchmarks/mysql.output
-	cat /tmp/count-push-pop.txt >> build/benchmarks/mysql.output 
+	cat /tmp/count-push-pop.txt | $(COUNTSUM) >> build/benchmarks/mysql.output 
 endef
 
 benchmarks/mysql: build/benchmarks/mysql-experiment/packages/mysql-boost-8.0.30.tar.gz

@@ -14,6 +14,7 @@ COMMA := ,
 
 all: pgolto pgolto-full pgolto-ipra  pgolto-full-ipra pgolto-full-fdoipra
 
+
 define build_gcc
 	rm -f /tmp/count-push-pop.txt 
 	touch /tmp/count-push-pop.txt
@@ -24,29 +25,37 @@ define build_gcc
 		--build=x86_64-linux-gnu \
 		--host=x86_64-linux-gnu \
 		--target=x86_64-linux-gnu \
-		--enable-offload-target=x86_64-pc-linux-gnu \
+		--enable-offload-target=x86_64-linux-gnu \
 		--prefix=$(PWD)/install.dir/$(1) \
 		--enable-checking=release \
-		--enable-languages=c,c++ \
+		--enable-languages=c \
 		--disable-multilib \
+		--disable-intermodule \
 		--disable-bootstrap \
+		--disable-coverage \
+		--disable-libvtv \
+		--disable-libssp \
+		--disable-libgomp \
+		--disable-libquadmath \
+		--disable-build-format-warnings \
 		CC=$(NCC) \
 		CXX=$(NCXX) \
 		$(2)
-	cd build.dir/$(1) && CLANG_PROXY_FOCUS=gcc CLANG_PROXY_ARGS="-Wl,-mllvm -Wl,-count-push-pop" time -o time.log make -j $(shell nproc) > build.log && make install-strip
+	cd build.dir/$(1) && CLANG_PROXY_FOCUS=gcc CLANG_PROXY_ARGS="-Wl,-mllvm -Wl,-count-push-pop" time -o time.log make all-gcc -j $(shell nproc) > build.log
 	echo "---------$(1)---------" >> ../gcc.output
-	cat /tmp/count-push-pop.txt >> ../gcc.output 
+	cat /tmp/count-push-pop.txt | $(COUNTSUM) >> ../gcc.output 
 	touch $(1)
 endef
 
 define run_bench
 	mkdir -p build.dir/bench/$(1)
-	cd build.dir/bench/$(1) && cmake -G Ninja $(LLVM_IPRA)/llvm \
+	cd build.dir/bench/$(1) && cmake -G Ninja $(PWD)/../dparser/dparser-master \
 		-DCMAKE_BUILD_TYPE=RelWithDebInfo \
 		-DLLVM_TARGETS_TO_BUILD=X86 \
 		-DLLVM_OPTIMIZED_TABLEGEN=On \
-		-DCMAKE_C_COMPILER=$(2)/gcc \
-		-DCMAKE_CXX_COMPILER=$(2)/g++
+		-DCMAKE_C_FLAGS=-B$(2)
+		-DCMAKE_C_COMPILER=$(2)/xgcc \
+		-DCMAKE_CXX_LINK_EXECUTABLE=gcc
 	cd build.dir/bench/$(1) && (ninja -t commands | head -100 > $(PWD)/build.dir/bench/$(1)/perf_commands.sh)
 	cd build.dir/bench/$(1) && chmod +x ./perf_commands.sh
 endef 
@@ -75,9 +84,10 @@ gcc-releases-$(GCC_VERSION):
 	cd gcc-releases-$(GCC_VERSION) && find . -type f -name configure -exec sed -i 's/\$$CC -print-multi-os-directory/gcc -print-multi-os-directory/g' {} \;
 	cd gcc-releases-$(GCC_VERSION) && find . -type f -name configure -exec sed -i 's/\$$CXX -print-multi-os-directory/gcc -print-multi-os-directory/g' {} \;
 	cd gcc-releases-$(GCC_VERSION) && find . -type f -name configure -exec sed -i 's/\$$CC \$$CPPFLAGS \$$CFLAGS \$$LDFLAGS -print-multi-os-directory/gcc -print-multi-os-directory/g' {} \;
+	make benchmarks/dparser/dparser-master
 
 $(INSTRUMENTED_PROF)/gcc.profdata:  instrumented
-	$(call run_bench,instrumented,$(PWD)/install.dir/instrumented/bin)
+	$(call run_bench,instrumented,$(PWD)/build.dir/instrumented/gcc)
 	cd build.dir/bench/instrumented && ./perf_commands.sh
 	cd $(INSTRUMENTED_PROF) && $(LLVM_BIN)/llvm-profdata merge -output=gcc.profdata *
 

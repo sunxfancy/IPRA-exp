@@ -14,3 +14,10 @@ or after clone, run:
 ```sh
 git submodule update --init --recursive
 ```
+
+## install tools
+
+Required tools:
+1. CMake
+2. ninja-build
+3. 

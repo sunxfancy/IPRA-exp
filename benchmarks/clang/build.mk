@@ -4,8 +4,8 @@ CLANG_VERSION=llvmorg-14.0.6
 LLVM = $(PWD)/llvm-project-$(CLANG_VERSION)/llvm
 INSTRUMENTED_PROF=$(PWD)/build.dir/instrumented/profiles
 
-all: pgo pgo-fdoipra pgolto pgolto-full pgolto-ipra pgolto-full-ipra pgolto-fdoipra pgolto-full-fdoipra 
-bench: pgo.bench pgo-fdoipra.bench pgolto.bench pgolto-full.bench pgolto-ipra.bench pgolto-full-ipra.bench pgolto-fdoipra.bench pgolto-full-fdoipra.bench
+all:  pgolto pgolto-full pgolto-ipra pgolto-full-ipra pgolto-fdoipra pgolto-full-fdoipra 
+bench:  pgolto.bench pgolto-full.bench pgolto-ipra.bench pgolto-full-ipra.bench pgolto-fdoipra.bench pgolto-full-fdoipra.bench
 common_compiler_flags := -fuse-ld=lld -fPIC -fno-optimize-sibling-calls
 common_linker_flags := -fuse-ld=lld -fno-optimize-sibling-calls
 
@@ -37,7 +37,7 @@ define build_clang
 		$(2)
 	cd build.dir/$(1) && CLANG_PROXY_FOCUS=clang-14 CLANG_PROXY_ARGS="-Wl,-mllvm -Wl,-count-push-pop" time -o time.log ninja install -j $(shell nproc) -v > build.log
 	echo "---------$(1)---------" >> ../clang.output
-	cat /tmp/count-push-pop.txt >> ../clang.output 
+	cat /tmp/count-push-pop.txt | $(COUNTSUM) >> ../clang.output 
 	touch $(1)
 endef
 

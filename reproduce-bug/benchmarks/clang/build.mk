@@ -37,7 +37,7 @@ define build_clang
 		$(2)
 	cd build.dir/$(1) && time -o time.log ninja install -j $(shell nproc) -v > build.log
 	echo "---------$(1)---------" >> ../clang.output
-	cat /tmp/count-push-pop.txt >> ../clang.output 
+	cat /tmp/count-push-pop.txt | $(COUNTSUM) >> ../clang.output 
 	touch .$(1)
 endef
 
