@@ -42,8 +42,9 @@ endef
 benchmarks/mysql: build/benchmarks/mysql-experiment/packages/mysql-boost-8.0.30.tar.gz
 	rm -f build/benchmarks/mysql.output
 	$(call save_to_output,pgolto-mysql)
-	$(call save_to_output,pgolto-full-mysql)
 	$(call save_to_output,pgolto-ipra-mysql)
+	$(call save_to_output,pgolto-fdoipra-mysql)
+	$(call save_to_output,pgolto-full-mysql)
 	$(call save_to_output,pgolto-full-ipra-mysql)
 	$(call save_to_output,pgolto-full-fdoipra-mysql)
 
@@ -51,8 +52,9 @@ benchmarks/mysql: build/benchmarks/mysql-experiment/packages/mysql-boost-8.0.30.
 
 benchmarks/mysql/bench: 
 	cd build/benchmarks/mysql-experiment && make pgolto-mysql/sysbench
-	cd build/benchmarks/mysql-experiment && make pgolto-full-mysql/sysbench
 	cd build/benchmarks/mysql-experiment && make pgolto-ipra-mysql/sysbench
+	cd build/benchmarks/mysql-experiment && make pgolto-fdoipra-mysql/sysbench
+	cd build/benchmarks/mysql-experiment && make pgolto-full-mysql/sysbench
 	cd build/benchmarks/mysql-experiment && make pgolto-full-ipra-mysql/sysbench
 	cd build/benchmarks/mysql-experiment && make pgolto-full-fdoipra-mysql/sysbench
 

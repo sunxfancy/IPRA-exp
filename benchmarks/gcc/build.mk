@@ -69,11 +69,14 @@ pgolto: $(INSTRUMENTED_PROF)/gcc.profdata
 pgolto-ipra: $(INSTRUMENTED_PROF)/gcc.profdata
 	$(call build_gcc,pgolto-ipra,$(call gen_build_flags,-flto=thin -fprofile-use=$(INSTRUMENTED_PROF)/gcc.profdata,-flto=thin -fprofile-use=$(INSTRUMENTED_PROF)/gcc.profdata -Wl$(COMMA)-mllvm -Wl$(COMMA)-enable-ipra -Wl$(COMMA)-Bsymbolic-non-weak-functions))
 
-pgolto-full-ipra: $(INSTRUMENTED_PROF)/gcc.profdata
-	$(call build_gcc,pgolto-full-ipra,$(call gen_build_flags,-flto=full -fprofile-use=$(INSTRUMENTED_PROF)/gcc.profdata,-flto=full -fprofile-use=$(INSTRUMENTED_PROF)/gcc.profdata -Wl$(COMMA)-mllvm -Wl$(COMMA)-enable-ipra -Wl$(COMMA)-Bsymbolic-non-weak-functions))
+pgolto-fdoipra: $(INSTRUMENTED_PROF)/gcc.profdata
+	$(call build_gcc,pgolto-full-fdoipra,$(call gen_build_flags,-flto=thin -fprofile-use=$(INSTRUMENTED_PROF)/gcc.profdata,-flto=thin -fprofile-use=$(INSTRUMENTED_PROF)/gcc.profdata -Wl$(COMMA)-mllvm -Wl$(COMMA)-fdo-ipra -Wl$(COMMA)-Bsymbolic-non-weak-functions))
 
 pgolto-full: $(INSTRUMENTED_PROF)/gcc.profdata
 	$(call build_gcc,pgolto-full,$(call gen_build_flags,-flto=full -fprofile-use=$(INSTRUMENTED_PROF)/gcc.profdata,-flto=full -fprofile-use=$(INSTRUMENTED_PROF)/gcc.profdata -Wl$(COMMA)-Bsymbolic-non-weak-functions))
+
+pgolto-full-ipra: $(INSTRUMENTED_PROF)/gcc.profdata
+	$(call build_gcc,pgolto-full-ipra,$(call gen_build_flags,-flto=full -fprofile-use=$(INSTRUMENTED_PROF)/gcc.profdata,-flto=full -fprofile-use=$(INSTRUMENTED_PROF)/gcc.profdata -Wl$(COMMA)-mllvm -Wl$(COMMA)-enable-ipra -Wl$(COMMA)-Bsymbolic-non-weak-functions))
 
 pgolto-full-fdoipra: $(INSTRUMENTED_PROF)/gcc.profdata
 	$(call build_gcc,pgolto-full-fdoipra,$(call gen_build_flags,-flto=full -fprofile-use=$(INSTRUMENTED_PROF)/gcc.profdata,-flto=full -fprofile-use=$(INSTRUMENTED_PROF)/gcc.profdata -Wl$(COMMA)-mllvm -Wl$(COMMA)-fdo-ipra -Wl$(COMMA)-Bsymbolic-non-weak-functions))
