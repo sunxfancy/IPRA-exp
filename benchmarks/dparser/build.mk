@@ -16,28 +16,49 @@ COMMA := ,
 
 define build
 	rm -f /tmp/count-push-pop.txt 
-	$(FDO) opt --pgo $(2)
-	echo "---------$(1)---------" >> dparser.output
-	cat /tmp/count-push-pop.txt | $(COUNTSUM) >> dparser.output 
-	touch .$(1)
+	touch /tmp/count-push-pop.txt
+	mkdir -p build.dir/$(1)
+	cd build.dir/$(1) && cmake -G Ninja dparser-master \
+		-DCMAKE_BUILD_TYPE=Release \
+		-DCMAKE_C_COMPILER=$(NCC) \
+		-DCMAKE_CXX_COMPILER=$(NCXX) \
+		$(2)
+	cd build.dir/$(1) && CLANG_PROXY_FOCUS=make_dparser CLANG_PROXY_ARGS="-Wl,-mllvm -Wl,-count-push-pop" time -o time.log ninja -j $(shell nproc) -v > build.log
+	echo "---------$(1)---------" >> ../dparser.output
+	cat /tmp/count-push-pop.txt | $(COUNTSUM) >> ../dparser.output 
+	touch $(1)
 endef
 
+
 instrumented: dparser-master
-	mkdir -p build.dir/dparser
-	$(FDO) config dparser-master -DCMAKE_BUILD_TYPE=Release
+	$(call build,$@,$(call gen_build_flags,-fprofile-generate=$(INSTRUMENTED_PROF),-fprofile-generate=$(INSTRUMENTED_PROF)))
 
-	$(FDO) build --lto=full -s $(mkfile_path)DParser.yaml --pgo
-	$(FDO) test  --pgo
-	touch instrumented
+pgolto: $(INSTRUMENTED_PROF)/dparser.profdata
+	$(call build,$@,$(gen_build_flags,-flto=thin -fprofile-use=$(INSTRUMENTED_PROF)/dparser.profdata,-flto=thin -fprofile-use=$(INSTRUMENTED_PROF)/dparser.profdata))
 
-pgolto: instrumented
-	$(call build,pgolto,$(gen_build_flags,,))
+pgolto-ipra: $(INSTRUMENTED_PROF)/dparser.profdata
+	$(call build,$@,$(gen_build_flags,,-Wl$(COMMA)-mllvm -Wl$(COMMA)-enable-ipra -Wl$(COMMA)-Bsymbolic-non-weak-functions))
 
-pgolto-ipra: instrumented
-	$(call build,pgolto,$(gen_build_flags,,-Wl$(COMMA)-mllvm -Wl$(COMMA)-enable-ipra -Wl$(COMMA)-Bsymbolic-non-weak-functions))
+pgolto-fdoipra: $(INSTRUMENTED_PROF)/dparser.profdata
+	$(call build,$@,$(gen_build_flags,,-Wl$(COMMA)-mllvm -Wl$(COMMA)-fdo-ipra -Wl$(COMMA)-Bsymbolic-non-weak-functions))
 
-pgolto-fdoipra: instrumented
-	$(call build,pgolto,$(gen_build_flags,,-Wl$(COMMA)-mllvm -Wl$(COMMA)-fdo-ipra -Wl$(COMMA)-Bsymbolic-non-weak-functions))
+
+pgolto-full: $(INSTRUMENTED_PROF)/dparser.profdata
+	$(call build,$@,$(gen_build_flags,,))
+
+pgolto-full-ipra: $(INSTRUMENTED_PROF)/dparser.profdata
+	$(call build,$@,$(gen_build_flags,,-Wl$(COMMA)-mllvm -Wl$(COMMA)-enable-ipra -Wl$(COMMA)-Bsymbolic-non-weak-functions))
+
+pgolto-full-fdoipra: $(INSTRUMENTED_PROF)/dparser.profdata
+	$(call build,$@,$(gen_build_flags,,-Wl$(COMMA)-mllvm -Wl$(COMMA)-fdo-ipra -Wl$(COMMA)-Bsymbolic-non-weak-functions))
+
+
+$(INSTRUMENTED_PROF)/dparser.profdata:  instrumented
+	$(call run_bench,instrumented,$(PWD)/build.dir/instrumented/dparser)
+	cd build.dir/bench/instrumented && ./perf_commands.sh
+	cd $(INSTRUMENTED_PROF) && $(LLVM_BIN)/llvm-profdata merge -output=dparser.profdata *
+
+
 
 dparser-master:
 	wget https://github.com/jplevyak/dparser/archive/refs/heads/master.zip && unzip ./master.zip && rm ./master.zip
