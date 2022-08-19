@@ -29,7 +29,7 @@ func RunWithMultiWriter(command *exec.Cmd) int {
 }
 
 func RunCommand(cmd string, args ...string) int {
-	PrintCommand(cmd, args...)
+	// PrintCommand(cmd, args...)
 	command := exec.Command(cmd, args...)
 	return RunWithMultiWriter(command)
 }

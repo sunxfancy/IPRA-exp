@@ -4,6 +4,7 @@ LLVM_BUILD_TYPE=RelWithDebInfo
 PWD=$(shell pwd)
 FDO=install/FDO
 
+LLVM_IPRA = $(PWD)/LLVM-IPRA
 LLVM_BIN = $(PWD)/install/llvm/bin
 
 NCC = $(PWD)/install/llvm/bin/clang-proxy

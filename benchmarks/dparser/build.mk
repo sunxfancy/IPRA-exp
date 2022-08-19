@@ -22,21 +22,21 @@ define build
 	touch .$(1)
 endef
 
-.instrumented: dparser-master
+instrumented: dparser-master
 	mkdir -p build.dir/dparser
 	$(FDO) config dparser-master -DCMAKE_BUILD_TYPE=Release
 
 	$(FDO) build --lto=full -s $(mkfile_path)DParser.yaml --pgo
 	$(FDO) test  --pgo
-	touch .instrumented
+	touch instrumented
 
-.pgolto: .instrumented
+pgolto: instrumented
 	$(call build,pgolto,$(gen_build_flags,,))
 
-.pgolto-ipra: .instrumented
+pgolto-ipra: instrumented
 	$(call build,pgolto,$(gen_build_flags,,-Wl$(COMMA)-mllvm -Wl$(COMMA)-enable-ipra -Wl$(COMMA)-Bsymbolic-non-weak-functions))
 
-.pgolto-fdoipra: .instrumented
+pgolto-fdoipra: instrumented
 	$(call build,pgolto,$(gen_build_flags,,-Wl$(COMMA)-mllvm -Wl$(COMMA)-fdo-ipra -Wl$(COMMA)-Bsymbolic-non-weak-functions))
 
 dparser-master:
