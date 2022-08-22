@@ -12,9 +12,8 @@ gen_linker_flags   =LDFLAGS=$(1)
 gen_build_flags =$(call gen_compiler_flags,"$(common_compiler_flags) $(1)") $(call gen_linker_flags,"$(common_linker_flags) $(2)")
 COMMA := ,
 
-all: pgolto pgolto-full pgolto-ipra  pgolto-full-ipra pgolto-full-fdoipra
-
-
+all:  pgolto pgolto-ipra pgolto-fdoipra pgolto-full pgolto-full-ipra pgolto-full-fdoipra 
+bench:  pgolto.bench pgolto-ipra.bench pgolto-fdoipra.bench pgolto-full.bench pgolto-full-ipra.bench pgolto-full-fdoipra.bench
 define build_gcc
 	rm -f /tmp/count-push-pop.txt 
 	touch /tmp/count-push-pop.txt
@@ -41,7 +40,7 @@ define build_gcc
 		CC=$(NCC) \
 		CXX=$(NCXX) \
 		$(2)
-	cd build.dir/$(1) && CLANG_PROXY_FOCUS=gcc CLANG_PROXY_ARGS="-Wl,-mllvm -Wl,-count-push-pop" time -o time.log make all-gcc -j $(shell nproc) > build.log
+	cd build.dir/$(1) && CLANG_PROXY_FOCUS=xgcc CLANG_PROXY_ARGS="-Wl,-mllvm -Wl,-count-push-pop" time -o time.log make all-gcc -j $(shell nproc) > build.log
 	echo "---------$(1)---------" >> ../gcc.output
 	cat /tmp/count-push-pop.txt | $(COUNTSUM) >> ../gcc.output 
 	touch $(1)
@@ -51,11 +50,11 @@ define run_bench
 	mkdir -p build.dir/bench/$(1)
 	cd build.dir/bench/$(1) && cmake -G Ninja $(PWD)/../dparser/dparser-master \
 		-DCMAKE_BUILD_TYPE=RelWithDebInfo \
-		-DLLVM_TARGETS_TO_BUILD=X86 \
-		-DLLVM_OPTIMIZED_TABLEGEN=On \
-		-DCMAKE_C_FLAGS=-B$(2)
+		-DCMAKE_C_FLAGS="-B$(2) -fPIE" \
 		-DCMAKE_C_COMPILER=$(2)/xgcc \
-		-DCMAKE_CXX_LINK_EXECUTABLE=gcc
+		-DCMAKE_LINKER=gcc \
+		-DCMAKE_USER_MAKE_RULES_OVERRIDE=$(mkfile_path)makerules.cmake \
+		-DCMAKE_BUILD_WITH_INSTALL_RPATH=ON
 	cd build.dir/bench/$(1) && (ninja -t commands | head -100 > $(PWD)/build.dir/bench/$(1)/perf_commands.sh)
 	cd build.dir/bench/$(1) && chmod +x ./perf_commands.sh
 endef 
@@ -94,3 +93,6 @@ $(INSTRUMENTED_PROF)/gcc.profdata:  instrumented
 	cd build.dir/bench/instrumented && ./perf_commands.sh
 	cd $(INSTRUMENTED_PROF) && $(LLVM_BIN)/llvm-profdata merge -output=gcc.profdata *
 
+%.bench: %
+	$(call run_bench,$(basename $@),$(PWD)/build.dir/$(basename $@)/gcc)
+	cd build.dir/bench/$(basename $@) && perf stat -o $(basename $@).bench -r5 -- ./perf_commands.sh

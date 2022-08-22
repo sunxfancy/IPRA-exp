@@ -4,8 +4,8 @@ CLANG_VERSION=llvmorg-14.0.6
 LLVM = $(PWD)/llvm-project-$(CLANG_VERSION)/llvm
 INSTRUMENTED_PROF=$(PWD)/build.dir/instrumented/profiles
 
-all:  pgolto pgolto-full pgolto-ipra pgolto-full-ipra pgolto-fdoipra pgolto-full-fdoipra 
-bench:  pgolto.bench pgolto-full.bench pgolto-ipra.bench pgolto-full-ipra.bench pgolto-fdoipra.bench pgolto-full-fdoipra.bench
+all:  pgolto pgolto-ipra pgolto-fdoipra pgolto-full pgolto-full-ipra pgolto-full-fdoipra 
+bench:  pgolto.bench pgolto-ipra.bench pgolto-fdoipra.bench pgolto-full.bench pgolto-full-ipra.bench pgolto-full-fdoipra.bench
 common_compiler_flags := -fuse-ld=lld -fPIC -fno-optimize-sibling-calls
 common_linker_flags := -fuse-ld=lld -fno-optimize-sibling-calls
 
