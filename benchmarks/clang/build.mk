@@ -38,6 +38,8 @@ define build_clang
 	cd build.dir/$(1) && CLANG_PROXY_FOCUS=clang-14 CLANG_PROXY_ARGS="-Wl,-mllvm -Wl,-count-push-pop" time -o time.log ninja install -j $(shell nproc) -v > build.log
 	echo "---------$(1)---------" >> ../clang.output
 	cat /tmp/count-push-pop.txt | $(COUNTSUM) >> ../clang.output 
+	echo "---------$(1)---------" >> ../clang.raw
+	cat /tmp/count-push-pop.txt >> ../clang.raw 
 	touch $(1)
 endef
 

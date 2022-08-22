@@ -37,10 +37,11 @@ define save_to_output
 	cd build/benchmarks/mysql-experiment && make $(1)/install/bin/mysqld LLVM_INSTALL_BIN=$(PWD)/install/llvm/bin
 	echo "---------$(1)---------" >> build/benchmarks/mysql.output
 	cat /tmp/count-push-pop.txt | $(COUNTSUM) >> build/benchmarks/mysql.output 
+	echo "---------$(1)---------" >> build/benchmarks/mysql.raw
+	cat /tmp/count-push-pop.txt >> build/benchmarks/mysql.raw 
 endef
 
 benchmarks/mysql: build/benchmarks/mysql-experiment/packages/mysql-boost-8.0.30.tar.gz
-	rm -f build/benchmarks/mysql.output
 	$(call save_to_output,pgolto-mysql)
 	$(call save_to_output,pgolto-ipra-mysql)
 	$(call save_to_output,pgolto-fdoipra-mysql)
