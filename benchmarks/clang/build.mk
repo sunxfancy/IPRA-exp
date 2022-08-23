@@ -101,7 +101,7 @@ $(INSTRUMENTED_PROF)/clang.profdata: instrumented
 
 %.bench: % 
 	$(call clang_bench,$(basename $@),$(PWD)/install.dir/$(basename $@)/bin)
-	cd build.dir/clangbench/$(basename $@) && perf stat -o $(basename $@).bench -r5 -- bash ./perf_commands.sh
+	cd build.dir/clangbench/$(basename $@) && perf stat -o $(basename $@).bench -r5 -- taskset -c 1 bash ./perf_commands.sh
 
 llvm-project-$(CLANG_VERSION):
 	wget https://github.com/llvm/llvm-project/archive/refs/tags/$(CLANG_VERSION).zip && unzip $(CLANG_VERSION) && rm -f $(CLANG_VERSION).zip

@@ -40,9 +40,11 @@ define build_gcc
 		CC=$(NCC) \
 		CXX=$(NCXX) \
 		$(2)
-	cd build.dir/$(1) && CLANG_PROXY_FOCUS=xgcc CLANG_PROXY_ARGS="-Wl,-mllvm -Wl,-count-push-pop" time -o time.log make all-gcc -j $(shell nproc) > build.log
+	cd build.dir/$(1) && CLANG_PROXY_FOCUS=cc1 CLANG_PROXY_ARGS="-Wl,-mllvm -Wl,-count-push-pop" time -o time.log make all-gcc -j $(shell nproc) > build.log
 	echo "---------$(1)---------" >> ../gcc.output
 	cat /tmp/count-push-pop.txt | $(COUNTSUM) >> ../gcc.output 
+	echo "---------$(1)---------" >> ../gcc.raw
+	cat /tmp/count-push-pop.txt >> ../gcc.raw 
 	touch $(1)
 endef
 
@@ -95,4 +97,4 @@ $(INSTRUMENTED_PROF)/gcc.profdata:  instrumented
 
 %.bench: %
 	$(call run_bench,$(basename $@),$(PWD)/build.dir/$(basename $@)/gcc)
-	cd build.dir/bench/$(basename $@) && perf stat -o $(basename $@).bench -r5 -- ./perf_commands.sh
+	cd build.dir/bench/$(basename $@) && perf stat -o $(basename $@).bench -r5 -- taskset -c 1 bash ./perf_commands.sh
