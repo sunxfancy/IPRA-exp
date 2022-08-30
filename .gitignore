@@ -11,3 +11,5 @@
 /reproduce-bug/llvm-project-main
 .gdb_history
 *.output
+/.cache/
+compile_commands.json

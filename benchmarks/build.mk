@@ -42,12 +42,16 @@ define save_to_output
 endef
 
 benchmarks/mysql: build/benchmarks/mysql-experiment/packages/mysql-boost-8.0.30.tar.gz
+	cd build/benchmarks/mysql-experiment && make pgo_instrument-mysql/profile-data/default.profdata LLVM_INSTALL_BIN=$(PWD)/install/llvm/bin
 	-$(call save_to_output,pgolto-mysql)
 	-$(call save_to_output,pgolto-ipra-mysql)
 	-$(call save_to_output,pgolto-fdoipra-mysql)
 	-$(call save_to_output,pgolto-full-mysql)
 	-$(call save_to_output,pgolto-full-ipra-mysql)
 	-$(call save_to_output,pgolto-full-fdoipra-mysql)
+
+benchmarks/mysql/%:
+	-$(call save_to_output,$(notdir $@)-mysql)
 
 # $(call save_to_output,pgolto-full-ipra-fdoipra-mysql)
 

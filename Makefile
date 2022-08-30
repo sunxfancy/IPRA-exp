@@ -89,7 +89,8 @@ build/llvm: check-tools LLVM-IPRA
 		-DLLVM_TARGETS_TO_BUILD="X86" \
 		-DLLVM_ENABLE_RTTI=ON \
 		-DLLVM_ENABLE_PROJECTS="clang;lld;llvm;compiler-rt;bolt" \
-		-DCMAKE_INSTALL_PREFIX=install/llvm
+		-DCMAKE_INSTALL_PREFIX=install/llvm \
+		-DCMAKE_EXPORT_COMPILE_COMMANDS=1
 
 install/FDO: check-tools FDO
 	mkdir -p install 
