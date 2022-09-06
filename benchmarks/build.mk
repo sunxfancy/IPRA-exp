@@ -43,12 +43,14 @@ endef
 
 benchmarks/mysql: build/benchmarks/mysql-experiment/packages/mysql-boost-8.0.30.tar.gz
 	cd build/benchmarks/mysql-experiment && make pgo_instrument-mysql/profile-data/default.profdata LLVM_INSTALL_BIN=$(PWD)/install/llvm/bin
-	-$(call save_to_output,pgolto-mysql)
-	-$(call save_to_output,pgolto-ipra-mysql)
-	-$(call save_to_output,pgolto-fdoipra-mysql)
+# -$(call save_to_output,pgolto-mysql)
+# -$(call save_to_output,pgolto-ipra-mysql)
+# -$(call save_to_output,pgolto-fdoipra-mysql)
 	-$(call save_to_output,pgolto-full-mysql)
 	-$(call save_to_output,pgolto-full-ipra-mysql)
 	-$(call save_to_output,pgolto-full-fdoipra-mysql)
+	-$(call save_to_output,pgolto-full-fdoipra2-mysql)
+	-$(call save_to_output,pgolto-full-fdoipra3-mysql)
 
 benchmarks/mysql/%:
 	-$(call save_to_output,$(notdir $@)-mysql)
@@ -56,12 +58,14 @@ benchmarks/mysql/%:
 # $(call save_to_output,pgolto-full-ipra-fdoipra-mysql)
 
 benchmarks/mysql/bench: 
-	-cd build/benchmarks/mysql-experiment && make pgolto-mysql/sysbench
-	-cd build/benchmarks/mysql-experiment && make pgolto-ipra-mysql/sysbench
-	-cd build/benchmarks/mysql-experiment && make pgolto-fdoipra-mysql/sysbench
+# -cd build/benchmarks/mysql-experiment && make pgolto-mysql/sysbench
+# -cd build/benchmarks/mysql-experiment && make pgolto-ipra-mysql/sysbench
+# -cd build/benchmarks/mysql-experiment && make pgolto-fdoipra-mysql/sysbench
 	-cd build/benchmarks/mysql-experiment && make pgolto-full-mysql/sysbench
 	-cd build/benchmarks/mysql-experiment && make pgolto-full-ipra-mysql/sysbench
 	-cd build/benchmarks/mysql-experiment && make pgolto-full-fdoipra-mysql/sysbench
+	-cd build/benchmarks/mysql-experiment && make pgolto-full-fdoipra2-mysql/sysbench
+	-cd build/benchmarks/mysql-experiment && make pgolto-full-fdoipra3-mysql/sysbench
 
 export
 
