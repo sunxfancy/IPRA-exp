@@ -2,8 +2,9 @@
 benchmarks: benchmarks-build
 	make benchmarks/mysql/bench
 	make benchmarks/clang/bench
+	make benchmarks/gcc/bench
 
-benchmarks-build: benchmarks/mysql benchmarks/clang
+benchmarks-build: benchmarks/mysql benchmarks/clang benchmarks/gcc
 
 DonwloadTargets = download/snubench download/dparser download/vorbis-tools download/C_FFT 
 
