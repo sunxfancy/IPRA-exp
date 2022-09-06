@@ -4,8 +4,10 @@ CLANG_VERSION=llvmorg-14.0.6
 LLVM = $(PWD)/llvm-project-$(CLANG_VERSION)/llvm
 INSTRUMENTED_PROF=$(PWD)/build.dir/instrumented/profiles
 
-all:  pgolto pgolto-ipra pgolto-fdoipra pgolto-full pgolto-full-ipra pgolto-full-fdoipra 
-bench:  pgolto.bench pgolto-ipra.bench pgolto-fdoipra.bench pgolto-full.bench pgolto-full-ipra.bench pgolto-full-fdoipra.bench
+# pgolto pgolto-ipra pgolto-fdoipra
+# pgolto.bench pgolto-ipra.bench pgolto-fdoipra.bench
+all:   pgolto-full pgolto-full-ipra pgolto-full-fdoipra pgolto-full-fdoipra2 pgolto-full-fdoipra3
+bench:   pgolto-full.bench pgolto-full-ipra.bench pgolto-full-fdoipra.bench pgolto-full-fdoipra2.bench pgolto-full-fdoipra3.bench
 common_compiler_flags := -fuse-ld=lld -fPIC -fno-optimize-sibling-calls
 common_linker_flags := -fuse-ld=lld -fno-optimize-sibling-calls
 
@@ -87,6 +89,12 @@ pgolto-fdoipra: $(INSTRUMENTED_PROF)/clang.profdata
 
 pgolto-full-fdoipra: $(INSTRUMENTED_PROF)/clang.profdata
 	$(call build_clang,$@,-DLLVM_ENABLE_LTO=Full $(call gen_build_flags,,-Wl$(COMMA)-mllvm -Wl$(COMMA)-fdo-ipra -Wl$(COMMA)-Bsymbolic-non-weak-functions) -DLLVM_PROFDATA_FILE=$(INSTRUMENTED_PROF)/clang.profdata)
+
+pgolto-full-fdoipra2: $(INSTRUMENTED_PROF)/clang.profdata
+	$(call build_clang,$@,-DLLVM_ENABLE_LTO=Full $(call gen_build_flags,,-Wl$(COMMA)-mllvm -Wl$(COMMA)-fdo-ipra -Wl$(COMMA)-mllvm -Wl$(COMMA)-fdoipra-ch=1 -Wl$(COMMA)-Bsymbolic-non-weak-functions) -DLLVM_PROFDATA_FILE=$(INSTRUMENTED_PROF)/clang.profdata)
+
+pgolto-full-fdoipra3: $(INSTRUMENTED_PROF)/clang.profdata
+	$(call build_clang,$@,-DLLVM_ENABLE_LTO=Full $(call gen_build_flags,,-Wl$(COMMA)-mllvm -Wl$(COMMA)-fdo-ipra -Wl$(COMMA)-mllvm -Wl$(COMMA)-fdoipra-ch=1 -Wl$(COMMA)-mllvm -Wl$(COMMA)-fdoipra-hc=1 -Wl$(COMMA)-Bsymbolic-non-weak-functions) -DLLVM_PROFDATA_FILE=$(INSTRUMENTED_PROF)/clang.profdata)
 
 pgolto-ipra-fdoipra: $(INSTRUMENTED_PROF)/clang.profdata
 	$(call build_clang,$@,-DLLVM_ENABLE_LTO=Thin $(call gen_build_flags,,-Wl$(COMMA)-mllvm -Wl$(COMMA)-fdo-ipra -Wl$(COMMA)-mllvm -Wl$(COMMA)-enable-ipra -Wl$(COMMA)-Bsymbolic-non-weak-functions) -DLLVM_PROFDAT_FILE=$(INSTRUMENTED_PROF)/clang.profdata)

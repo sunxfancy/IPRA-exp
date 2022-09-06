@@ -12,8 +12,10 @@ gen_linker_flags   =LDFLAGS=$(1)
 gen_build_flags =$(call gen_compiler_flags,"$(common_compiler_flags) $(1)") $(call gen_linker_flags,"$(common_linker_flags) $(2)")
 COMMA := ,
 
-all:  pgolto pgolto-ipra pgolto-fdoipra pgolto-full pgolto-full-ipra pgolto-full-fdoipra 
-bench:  pgolto.bench pgolto-ipra.bench pgolto-fdoipra.bench pgolto-full.bench pgolto-full-ipra.bench pgolto-full-fdoipra.bench
+# pgolto pgolto-ipra pgolto-fdoipra 
+# pgolto.bench pgolto-ipra.bench pgolto-fdoipra.bench
+all:  pgolto-full pgolto-full-ipra pgolto-full-fdoipra pgolto-full-fdoipra2 pgolto-full-fdoipra3 
+bench:   pgolto-full.bench pgolto-full-ipra.bench pgolto-full-fdoipra.bench pgolto-full-fdoipra2.bench pgolto-full-fdoipra3.bench
 define build_gcc
 	rm -f /tmp/count-push-pop.txt 
 	touch /tmp/count-push-pop.txt
@@ -81,6 +83,13 @@ pgolto-full-ipra: $(INSTRUMENTED_PROF)/gcc.profdata
 
 pgolto-full-fdoipra: $(INSTRUMENTED_PROF)/gcc.profdata
 	$(call build_gcc,$@,$(call gen_build_flags,-flto=full -fprofile-use=$(INSTRUMENTED_PROF)/gcc.profdata,-flto=full -fprofile-use=$(INSTRUMENTED_PROF)/gcc.profdata -Wl$(COMMA)-mllvm -Wl$(COMMA)-fdo-ipra -Wl$(COMMA)-Bsymbolic-non-weak-functions))
+
+pgolto-full-fdoipra2: $(INSTRUMENTED_PROF)/gcc.profdata
+	$(call build_gcc,$@,$(call gen_build_flags,-flto=full -fprofile-use=$(INSTRUMENTED_PROF)/gcc.profdata,-flto=full -fprofile-use=$(INSTRUMENTED_PROF)/gcc.profdata -Wl$(COMMA)-mllvm -Wl$(COMMA)-fdo-ipra -Wl$(COMMA)-mllvm -Wl$(COMMA)-fdoipra-ch=1 -Wl$(COMMA)-Bsymbolic-non-weak-functions))
+
+pgolto-full-fdoipra3: $(INSTRUMENTED_PROF)/gcc.profdata
+	$(call build_gcc,$@,$(call gen_build_flags,-flto=full -fprofile-use=$(INSTRUMENTED_PROF)/gcc.profdata,-flto=full -fprofile-use=$(INSTRUMENTED_PROF)/gcc.profdata -Wl$(COMMA)-mllvm -Wl$(COMMA)-fdo-ipra -Wl$(COMMA)-mllvm -Wl$(COMMA)-fdoipra-ch=1 -Wl$(COMMA)-mllvm -Wl$(COMMA)-fdoipra-hc=1 -Wl$(COMMA)-Bsymbolic-non-weak-functions))
+
 
 gcc-releases-$(GCC_VERSION):
 	wget https://github.com/gcc-mirror/gcc/archive/refs/tags/releases/$(GCC_VERSION).zip && unzip $(GCC_VERSION) && rm -f $(GCC_VERSION).zip

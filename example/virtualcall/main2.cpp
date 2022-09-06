@@ -17,7 +17,7 @@ struct Circle : Shape {
 };
 
 void Circle::draw(int num) {
-    printf("Draw %d %s\n", num, "circles");
+    g = num;
 }
 
 struct Square : Shape {
@@ -37,7 +37,7 @@ size_t foo(Shape* s, size_t k) {
     size_t e = k+5;
     for (size_t i = 0; i < k; ++i) {
         if (i == k-1) {
-            s->draw2(10);
+            s->draw(10);
         } else {
             a += 1;
             b += 2;
