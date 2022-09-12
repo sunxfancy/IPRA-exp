@@ -5,11 +5,7 @@ INSTRUMENTED_PROF=$(PWD)/build.dir/instrumented/profiles
 
 build:
 	cd spec2017/cpu2017 && source ./shrc && \
-		runcpu --action build --size ref --tune peak --config $(mkfile_path)propeller-thinlto.cfg --label llvm_ARCH_fdo1 intrate
-
-bench:
-
-
+		BASE_DIR=$(PWD) runcpu --action build  --config $(mkfile_path)propeller-thinlto.cfg --tune peak --define reprofile=1 intrate
 
 download: download/googlemarks
 	mpm fetch -a platforms/benchmarks/googlemarks/spec2017 spec2017

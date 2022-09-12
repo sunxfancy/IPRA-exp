@@ -7,6 +7,8 @@ FDO=install/FDO
 LLVM_IPRA = $(PWD)/LLVM-IPRA
 LLVM_BIN = $(PWD)/install/llvm/bin
 
+LLVM_ROOT_PATH = $(PWD)/install/llvm
+
 NCC = $(PWD)/install/llvm/bin/clang-proxy
 NCXX = $(PWD)/install/llvm/bin/clang-proxy++
 ENABLE_IPRA =  -mllvm -enable-ipra
