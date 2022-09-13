@@ -19,7 +19,7 @@ all: ipra2.S ipra.S fdo_ipra2.S fdo_ipra.S no_ipra.S
 ipra2.S: FDO
 	rm -f /tmp/count-push-pop.txt 
 	touch /tmp/count-push-pop.txt
-	$(NCC) -O3 -S -fprofile-use=instrumented/PGO.profdata \
+	$(NCC) -v -O3 -S -fprofile-use=instrumented/PGO.profdata \
 		-mllvm -count-push-pop \
 		-mllvm -fdo-ipra -mllvm -fdoipra-both-hot -mllvm -fdoipra-ch=1 -mllvm -fdoipra-hc=1 \
 		-mllvm -enable-value-profiling  \
@@ -31,7 +31,7 @@ ipra2.S: FDO
 ipra.S: FDO
 	rm -f /tmp/count-push-pop.txt 
 	touch /tmp/count-push-pop.txt
-	$(NCC) -O3 -S -fprofile-use=instrumented/PGO.profdata \
+	$(NCC) -v -O3 -S -fprofile-use=instrumented/PGO.profdata \
 		-mllvm -count-push-pop \
 		-mllvm -fdo-ipra -mllvm -fdoipra-both-hot -mllvm -fdoipra-ch=1 \
 		-mllvm -enable-value-profiling -mllvm -enable-ipra \
@@ -44,7 +44,7 @@ ipra.S: FDO
 fdo_ipra2.S: FDO
 	rm -f /tmp/count-push-pop.txt 
 	touch /tmp/count-push-pop.txt
-	$(NCC) -O3 -S -fprofile-use=instrumented/PGO.profdata \
+	$(NCC) -v -O3 -S -fprofile-use=instrumented/PGO.profdata \
 		-mllvm -count-push-pop \
 		-mllvm -fdo-ipra -mllvm -fdoipra-both-hot -mllvm -fdoipra-ch=1 \
 		-mllvm -debug-only=fdo-ipra \
@@ -55,7 +55,7 @@ fdo_ipra2.S: FDO
 fdo_ipra.S: FDO
 	rm -f /tmp/count-push-pop.txt 
 	touch /tmp/count-push-pop.txt
-	$(NCC) -O3 -S -fprofile-use=instrumented/PGO.profdata \
+	$(NCC) -v -O3 -S -fprofile-use=instrumented/PGO.profdata \
 		-mllvm -count-push-pop \
 		-mllvm -fdo-ipra -mllvm -fdoipra-both-hot -mllvm -fdoipra-ch=0 \
 		-mllvm -debug-only=fdo-ipra \
@@ -66,7 +66,7 @@ fdo_ipra.S: FDO
 no_ipra.S: FDO
 	rm -f /tmp/count-push-pop.txt 
 	touch /tmp/count-push-pop.txt
-	$(NCC) -O3 -S -fprofile-use=instrumented/PGO.profdata -mllvm -count-push-pop  $(mkfile_path)main.c -o no_ipra.S
+	$(NCC) -v -O3 -S -fprofile-use=instrumented/PGO.profdata -mllvm -count-push-pop  $(mkfile_path)main.c -o no_ipra.S
 	cat /tmp/count-push-pop.txt
 
 FDO:

@@ -90,6 +90,8 @@ build/llvm: check-tools LLVM-IPRA
 		-DLLVM_OPTIMIZED_TABLEGEN=ON \
 		-DLLVM_TARGETS_TO_BUILD="X86" \
 		-DLLVM_ENABLE_RTTI=ON \
+		-DCMAKE_C_FLAGS="-fkeep-inline-functions"
+		-DCMAKE_CXX_FLAGS="-fkeep-inline-functions" \
 		-DLLVM_ENABLE_PROJECTS="clang;lld;llvm;compiler-rt;bolt" \
 		-DCMAKE_INSTALL_PREFIX=install/llvm \
 		-DCMAKE_EXPORT_COMPILE_COMMANDS=1
