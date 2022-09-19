@@ -22,7 +22,7 @@ FDO:= $(PWD)/install/FDO
 CREATE_REG:= $(PWD)/install/autofdo/create_reg_prof
 
 .PHONY: build check-tools check-devlibs
-build: install/llvm install/autofdo install/FDO install/counter install/clang-proxy install/count-sum
+build: check-tools check-devlibs install/llvm install/autofdo install/FDO install/counter install/clang-proxy install/count-sum
 
 BUILD = build
 INSTALL = install
@@ -67,19 +67,19 @@ install/autofdo: build/autofdo
 	cp build/autofdo/profile_merger install/autofdo/profile_merger
 	cp build/autofdo/sample_merger install/autofdo/sample_merger
 
-build/autofdo: check-tools check-devlibs autofdo install/llvm
+build/autofdo: autofdo install/llvm
 	mkdir -p build
 	cmake -G Ninja -B build/autofdo -S autofdo \
 		-DCMAKE_BUILD_TYPE=${AUTOFDO_BUILD_TYPE} \
 		-DLLVM_PATH=${PWD}/install/llvm \
 		-DCMAKE_INSTALL_PREFIX=build/autofdo 
 
-install/llvm: build/llvm
+install/llvm: build/llvm/build.ninja
 	mkdir -p install/llvm
 	mold -run cmake --build build/llvm --config ${LLVM_BUILD_TYPE} -j $(shell nproc) --target install
 	mold -run cmake --build build/llvm --config ${LLVM_BUILD_TYPE} -j $(shell nproc) --target install-profile
 
-build/llvm: check-tools LLVM-IPRA
+build/llvm/build.ninja: LLVM-IPRA
 	mkdir -p build
 	cmake -G Ninja -B build/llvm -S LLVM-IPRA/llvm \
 		-DCMAKE_BUILD_TYPE=${LLVM_BUILD_TYPE} \
@@ -96,17 +96,17 @@ build/llvm: check-tools LLVM-IPRA
 		-DCMAKE_INSTALL_PREFIX=install/llvm \
 		-DCMAKE_EXPORT_COMPILE_COMMANDS=1
 
-install/FDO: check-tools FDO
+install/FDO: FDO
 	mkdir -p install 
 	cd FDO && go build .
 	mv FDO/FDO install/FDO
 
-install/counter: check-tools utils/counter.go
+install/counter: utils/counter.go
 	mkdir -p install
 	cd utils && go build counter.go
 	mv utils/counter install/counter
 
-install/clang-proxy: check-tools utils/clang-proxy.go build/llvm
+install/clang-proxy: utils/clang-proxy.go build/llvm
 	mkdir -p install
 	cd utils && go build clang-proxy.go
 	mv utils/clang-proxy install/llvm/bin/clang-proxy
