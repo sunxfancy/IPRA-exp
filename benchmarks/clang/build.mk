@@ -8,9 +8,8 @@ INSTRUMENTED_PROF=$(PWD)/build.dir/instrumented/profiles
 # pgolto.bench pgolto-ipra.bench pgolto-fdoipra.bench
 all:   pgolto-full pgolto-full-ipra pgolto-full-fdoipra pgolto-full-fdoipra2 pgolto-full-fdoipra3
 bench:   pgolto-full.bench pgolto-full-ipra.bench pgolto-full-fdoipra.bench pgolto-full-fdoipra2.bench pgolto-full-fdoipra3.bench
-common_compiler_flags := -fuse-ld=lld -fPIC -fno-optimize-sibling-calls -mllvm -fast-isel=false
-common_linker_flags := -fuse-ld=lld -fno-optimize-sibling-calls -Wl,-mllvm -Wl,-fast-isel=false
-
+common_compiler_flags := -fuse-ld=lld -fPIC -fno-optimize-sibling-calls -mllvm -fast-isel=false -fsplit-machine-functions
+common_linker_flags := -fuse-ld=lld -fno-optimize-sibling-calls -Wl,-mllvm -Wl,-fast-isel=false -fsplit-machine-functions
 gen_compiler_flags = -DCMAKE_C_FLAGS=$(1) -DCMAKE_CXX_FLAGS=$(1)
 gen_linker_flags   = -DCMAKE_EXE_LINKER_FLAGS=$(1) -DCMAKE_SHARED_LINKER_FLAGS=$(1) -DCMAKE_MODULE_LINKER_FLAGS=$(1)
 gen_build_flags = $(call gen_compiler_flags,"$(common_compiler_flags) $(1)") $(call gen_linker_flags,"$(common_linker_flags) $(2)")

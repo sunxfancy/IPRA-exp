@@ -4,8 +4,8 @@ GCC_VERSION=gcc-10.4.0
 INSTRUMENTED_PROF=$(PWD)/build.dir/instrumented/profiles
 
 
-common_compiler_flags :=-fuse-ld=lld -fno-optimize-sibling-calls -mllvm -fast-isel=false
-common_linker_flags :=-fuse-ld=lld -fno-optimize-sibling-calls -Wl,-mllvm -Wl,-fast-isel=false
+common_compiler_flags :=-fuse-ld=lld -fno-optimize-sibling-calls -mllvm -fast-isel=false -fsplit-machine-functions
+common_linker_flags :=-fuse-ld=lld -fno-optimize-sibling-calls -Wl,-mllvm -Wl,-fast-isel=false -fsplit-machine-functions
 
 gen_compiler_flags =CFLAGS=$(1) CXXFLAGS=$(1)
 gen_linker_flags   =LDFLAGS=$(1)
@@ -97,7 +97,7 @@ gcc-releases-$(GCC_VERSION):
 	cd gcc-releases-$(GCC_VERSION) && find . -type f -name configure -exec sed -i 's/\$$CC -print-multi-os-directory/gcc -print-multi-os-directory/g' {} \;
 	cd gcc-releases-$(GCC_VERSION) && find . -type f -name configure -exec sed -i 's/\$$CXX -print-multi-os-directory/gcc -print-multi-os-directory/g' {} \;
 	cd gcc-releases-$(GCC_VERSION) && find . -type f -name configure -exec sed -i 's/\$$CC \$$CPPFLAGS \$$CFLAGS \$$LDFLAGS -print-multi-os-directory/gcc -print-multi-os-directory/g' {} \;
-	make benchmarks/dparser/dparser-master
+	cd ../../.. &&  make benchmarks/dparser/dparser-master
 
 $(INSTRUMENTED_PROF)/gcc.profdata:  instrumented
 	$(call run_bench,instrumented,$(PWD)/build.dir/instrumented/gcc)
