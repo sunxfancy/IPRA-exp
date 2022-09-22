@@ -3,11 +3,11 @@ PWD := $(shell pwd)
 GCC_VERSION=gcc-10.4.0
 INSTRUMENTED_PROF=$(PWD)/build.dir/instrumented/profiles
 
-build:
-	cd spec2017/cpu2017 && source ./shrc && \
-		BASE_DIR=$(PWD) runcpu --action build  --config $(mkfile_path)propeller-thinlto.cfg --tune peak --define reprofile=1 intrate
+build: spec2017/cpu2017
+	export PATH=/data/googlemarks/numactl:$$PATH; cd spec2017/cpu2017 && source ./shrc && \
+		BASE_DIR=$(PWD) runcpu --action build  --config $(mkfile_path)propeller-thinlto.cfg --tune peak --define reprofile=1 intrate ^548
 
-download: download/googlemarks
+spec2017/cpu2017: download/googlemarks
 	mpm fetch -a platforms/benchmarks/googlemarks/spec2017 spec2017
 
 download/gperftools:

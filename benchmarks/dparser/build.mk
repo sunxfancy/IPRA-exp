@@ -5,8 +5,8 @@ INSTRUMENTED_PROF=$(PWD)/build.dir/instrumented/profiles
 
 all: pgolto pgolto-ipra pgolto-fdoipra pgolto-full pgolto-full-ipra pgolto-full-fdoipra
 bench: pgolto.bench pgolto-ipra.bench pgolto-fdoipra.bench pgolto-full.bench pgolto-full-ipra.bench pgolto-full-fdoipra.bench
-common_compiler_flags := -fuse-ld=lld 
-common_linker_flags := -fuse-ld=lld 
+common_compiler_flags := -fuse-ld=lld  -fno-optimize-sibling-calls -mllvm -fast-isel=false -fsplit-machine-functions
+common_linker_flags := -fuse-ld=lld -fno-optimize-sibling-calls -Wl,-mllvm -Wl,-fast-isel=false -fsplit-machine-functions
 
 gen_compiler_flags = -DCMAKE_C_FLAGS=$(1) -DCMAKE_CXX_FLAGS=$(1)
 gen_linker_flags   = -DCMAKE_EXE_LINKER_FLAGS=$(1) -DCMAKE_SHARED_LINKER_FLAGS=$(1) -DCMAKE_MODULE_LINKER_FLAGS=$(1)
@@ -55,11 +55,11 @@ pgolto-full-fdoipra: $(INSTRUMENTED_PROF)/dparser.profdata
 
 $(INSTRUMENTED_PROF)/dparser.profdata:  instrumented
 	$(call run_bench,instrumented,$(PWD)/build.dir/instrumented/dparser)
-	cd build.dir/instrumented && ./make_dparser -o test.c ../../dparser-master/tests/python.test.g 
+	cd build.dir/instrumented && bash $(mkfile_path)scripts.sh
 	cd $(INSTRUMENTED_PROF) && $(LLVM_BIN)/llvm-profdata merge -output=dparser.profdata *
 
 %.bench: %
-	cd build.dir/$(basename $@) && perf stat -o $(basename $@).bench -r5 -- taskset -c 1 ./make_dparser -o test.c ../../dparser-master/tests/python.test.g 
+	cd build.dir/$(basename $@) && perf stat -o $(basename $@).bench -r5 -- taskset -c 1 bash $(mkfile_path)scripts.sh
 
 dparser-master:
 	wget https://github.com/jplevyak/dparser/archive/refs/heads/master.zip && unzip ./master.zip && rm ./master.zip
