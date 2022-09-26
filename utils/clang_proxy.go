@@ -43,7 +43,7 @@ func match(path string, focus string) bool {
 }
 
 func convert(name string) string {
-	return strings.Replace(name, "clang-proxy", "clang", 1)
+	return strings.Replace(name, "clang_proxy", "clang", 1)
 }
 
 func mainReturnWithCode() int {

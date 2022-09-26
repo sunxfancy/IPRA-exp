@@ -8,8 +8,8 @@ INSTRUMENTED_PROF=$(PWD)/build.dir/instrumented/profiles
 # pgolto.bench pgolto-ipra.bench pgolto-fdoipra.bench
 all:   pgolto-full pgolto-full-ipra pgolto-full-fdoipra pgolto-full-fdoipra2 pgolto-full-fdoipra3
 bench:   pgolto-full.bench pgolto-full-ipra.bench pgolto-full-fdoipra.bench pgolto-full-fdoipra2.bench pgolto-full-fdoipra3.bench
-common_compiler_flags := -fuse-ld=lld -fPIC -fno-optimize-sibling-calls -mllvm -fast-isel=false -fsplit-machine-functions
-common_linker_flags := -fuse-ld=lld -fno-optimize-sibling-calls -Wl,-mllvm -Wl,-fast-isel=false -fsplit-machine-functions
+common_compiler_flags := -v -fuse-ld=lld -fPIC -fno-optimize-sibling-calls -mllvm -fast-isel=false -fsplit-machine-functions
+common_linker_flags := -v -fuse-ld=lld -fno-optimize-sibling-calls -Wl,-mllvm -Wl,-fast-isel=false -fsplit-machine-functions
 gen_compiler_flags = -DCMAKE_C_FLAGS=$(1) -DCMAKE_CXX_FLAGS=$(1)
 gen_linker_flags   = -DCMAKE_EXE_LINKER_FLAGS=$(1) -DCMAKE_SHARED_LINKER_FLAGS=$(1) -DCMAKE_MODULE_LINKER_FLAGS=$(1)
 gen_build_flags = $(call gen_compiler_flags,"$(common_compiler_flags) $(1)") $(call gen_linker_flags,"$(common_linker_flags) $(2)")
@@ -25,14 +25,14 @@ define build_clang
 		-DCMAKE_BUILD_TYPE=Release \
 		-DLLVM_OPTIMIZED_TABLEGEN=ON \
 		-DLLVM_TARGETS_TO_BUILD="X86" \
-		-DLLVM_ENABLE_RTTI=ON \
+		-DLLVM_ENABLE_RTTI=OFF \
 		-DBUILD_SHARED_LIBS=OFF \
 		-DLLVM_INCLUDE_TESTS=ON \
 		-DLLVM_BUILD_TESTS=ON \
 		-DLLVM_PARALLEL_LINK_JOBS=64 \
 		-DCMAKE_C_COMPILER=$(NCC) \
 		-DCMAKE_CXX_COMPILER=$(NCXX) \
-		-DLLVM_ENABLE_PROJECTS="clang;compiler-rt;lld" \
+		-DLLVM_ENABLE_PROJECTS="clang;lld" \
 		-DLLVM_USE_LINKER=lld \
 		-DCMAKE_INSTALL_PREFIX=$(PWD)/install.dir/$(1) \
 		$(2)
@@ -108,7 +108,11 @@ $(INSTRUMENTED_PROF)/clang.profdata: instrumented
 
 %.bench: % 
 	$(call clang_bench,$(basename $@),$(PWD)/install.dir/$(basename $@)/bin)
-	cd build.dir/clangbench/$(basename $@) && perf stat -o $(basename $@).bench -r5 -- taskset -c 1 bash ./perf_commands.sh
+	cd build.dir/clangbench/$(basename $@) && $(RUN_FOR_REMOTE) sed 's/[^ ]*IPRA-exp/\/tmp\/IRPA-exp/g; s/^:.*://g' ./perf_commands.sh > ./perf_commands-copy.sh && $(RUN_FOR_REMOTE) mv ./perf_commands-copy.sh ./perf_commands.sh
+	$(COPY_TO_REMOTE) build/benchmarks/clang/build.dir/clangbench/$(basename $@)/
+	$(COPY_TO_REMOTE) build/benchmarks/clang/install.dir/$(basename $@)/bin/clang-14
+	cd $(PWD)/install.dir/$(basename $@)/bin && $(RUN_ON_REMOTE) ln -sf ./clang-14 clang++
+	cd build.dir/clangbench/$(basename $@) && $(PERF) stat -o $(basename $@).bench -r5 -- taskset -c 1 bash ./perf_commands.sh
 
 llvm-project-$(CLANG_VERSION):
 	wget https://github.com/llvm/llvm-project/archive/refs/tags/$(CLANG_VERSION).zip && unzip $(CLANG_VERSION) && rm -f $(CLANG_VERSION).zip
