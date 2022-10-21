@@ -1,0 +1,2 @@
+-mllvm -enable-ipra
+-Wl,-mllvm -Wl,-enable-ipra

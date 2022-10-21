@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 )
 
@@ -29,9 +30,16 @@ func RunWithMultiWriter(command *exec.Cmd) int {
 }
 
 func RunCommand(cmd string, args ...string) int {
-	// PrintCommand(cmd, args...)
+	debug := os.Getenv("CLANG_PROXY_DEBUG")
+	if debug != "" {
+		PrintCommand(cmd, args...)
+	}
 	command := exec.Command(cmd, args...)
 	return RunWithMultiWriter(command)
+}
+
+func RunCommandAsync(c chan int, cmd string, args ...string) {
+	c <- RunCommand(cmd, args...)
 }
 
 func match(path string, focus string) bool {
@@ -50,20 +58,49 @@ func mainReturnWithCode() int {
 	l := len(os.Args)
 	focus := os.Getenv("CLANG_PROXY_FOCUS")
 	args := os.Getenv("CLANG_PROXY_ARGS")
+	variant := os.Getenv("CLANG_PROXY_VAR")
+
 	if focus == "" {
 		return RunCommand(convert(os.Args[0]), os.Args[1:]...)
-
 	}
 
 	for i := 0; i < l; i++ {
 		if os.Args[i] == "-o" {
 			if i+1 < l && match(os.Args[i+1], focus) {
-				list := os.Args[1:]
+				original := os.Args[1:]
+				list := original
 				if args != "" {
-					list = append(strings.Split(args, " "), list...)
+					argsList := strings.Split(args, " ")
+					list = append(argsList, original...)
+				}
+				if variant != "" {
+					conf := strings.Split(variant, ";")
+					retVal := make([]chan int, len(conf))
+					for j, c := range conf {
+						if c == "" {
+							continue
+						}
+						retVal[j] = make(chan int)
+						s := strings.Split(c, " ")
+						curI := i + len(s)
+						s = append(s, original...)
+						s[curI] = s[curI] + "." + strconv.Itoa(j)
+						go RunCommandAsync(retVal[j], convert(os.Args[0]), s...)
+					}
+					ret := RunCommand(convert(os.Args[0]), list...)
+					for j, c := range conf {
+						if c == "" {
+							continue
+						}
+						retNum := <-retVal[j]
+						if retNum != 0 {
+							ret = retNum
+						}
+						close(retVal[j])
+					}
+					return ret
 				}
 				return RunCommand(convert(os.Args[0]), list...)
-
 			}
 		}
 	}
