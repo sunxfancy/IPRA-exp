@@ -6,8 +6,8 @@ INSTRUMENTED_PROF=$(PWD)/build.dir/instrumented/profiles
 
 # pgolto pgolto-ipra pgolto-fdoipra
 # pgolto.bench pgolto-ipra.bench pgolto-fdoipra.bench
-all:   pgolto-full pgolto-full-ipra pgolto-full-fdoipra pgolto-full-fdoipra2 pgolto-full-fdoipra3
-bench:   pgolto-full.bench pgolto-full-ipra.bench pgolto-full-fdoipra.bench pgolto-full-fdoipra2.bench pgolto-full-fdoipra3.bench
+all:   pgolto-full pgolto-full-ipra pgolto-full-fdoipra pgolto-full-fdoipra2 pgolto-full-fdoipra3 pgolto-full-sfdoipra pgolto-full-sfdoipra2 pgolto-full-sfdoipra3
+bench:   pgolto-full.bench pgolto-full-ipra.bench pgolto-full-fdoipra.bench pgolto-full-fdoipra2.bench pgolto-full-fdoipra3.bench pgolto-full-sfdoipra.bench pgolto-full-sfdoipra2.bench pgolto-full-sfdoipra3.bench
 common_compiler_flags := -v -fuse-ld=lld -fPIC -fno-optimize-sibling-calls -mllvm -fast-isel=false -fsplit-machine-functions
 common_linker_flags := -v -fuse-ld=lld -fno-optimize-sibling-calls -Wl,-mllvm -Wl,-fast-isel=false -fsplit-machine-functions
 gen_compiler_flags = -DCMAKE_C_FLAGS=$(1) -DCMAKE_CXX_FLAGS=$(1)
@@ -95,6 +95,16 @@ pgolto-full-fdoipra2: $(INSTRUMENTED_PROF)/clang.profdata
 pgolto-full-fdoipra3: $(INSTRUMENTED_PROF)/clang.profdata
 	$(call build_clang,$@,-DLLVM_ENABLE_LTO=Full $(call gen_build_flags,,-Wl$(COMMA)-mllvm -Wl$(COMMA)-fdo-ipra -Wl$(COMMA)-mllvm -Wl$(COMMA)-fdoipra-ch=1 -Wl$(COMMA)-mllvm -Wl$(COMMA)-fdoipra-hc=1 -Wl$(COMMA)-Bsymbolic-non-weak-functions) -DLLVM_PROFDATA_FILE=$(INSTRUMENTED_PROF)/clang.profdata)
 
+pgolto-full-sfdoipra: $(INSTRUMENTED_PROF)/clang.profdata
+	$(call build_clang,$@,-DLLVM_ENABLE_LTO=Full $(call gen_build_flags,,-Wl$(COMMA)-mllvm -Wl$(COMMA)-fdo-ipra -Wl$(COMMA)-mllvm -Wl$(COMMA)-fdoipra-both-hot=false -Wl$(COMMA)-Bsymbolic-non-weak-functions) -DLLVM_PROFDATA_FILE=$(INSTRUMENTED_PROF)/clang.profdata)
+
+pgolto-full-sfdoipra2: $(INSTRUMENTED_PROF)/clang.profdata
+	$(call build_clang,$@,-DLLVM_ENABLE_LTO=Full $(call gen_build_flags,,-Wl$(COMMA)-mllvm -Wl$(COMMA)-fdo-ipra -Wl$(COMMA)-mllvm -Wl$(COMMA)-fdoipra-ch=1 -Wl$(COMMA)-mllvm -Wl$(COMMA)-fdoipra-both-hot=false -Wl$(COMMA)-Bsymbolic-non-weak-functions) -DLLVM_PROFDATA_FILE=$(INSTRUMENTED_PROF)/clang.profdata)
+
+pgolto-full-sfdoipra3: $(INSTRUMENTED_PROF)/clang.profdata
+	$(call build_clang,$@,-DLLVM_ENABLE_LTO=Full $(call gen_build_flags,,-Wl$(COMMA)-mllvm -Wl$(COMMA)-fdo-ipra -Wl$(COMMA)-mllvm -Wl$(COMMA)-fdoipra-ch=1 -Wl$(COMMA)-mllvm -Wl$(COMMA)-fdoipra-hc=1 -Wl$(COMMA)-mllvm -Wl$(COMMA)-fdoipra-both-hot=false -Wl$(COMMA)-Bsymbolic-non-weak-functions) -DLLVM_PROFDATA_FILE=$(INSTRUMENTED_PROF)/clang.profdata)
+
+
 pgolto-ipra-fdoipra: $(INSTRUMENTED_PROF)/clang.profdata
 	$(call build_clang,$@,-DLLVM_ENABLE_LTO=Thin $(call gen_build_flags,,-Wl$(COMMA)-mllvm -Wl$(COMMA)-fdo-ipra -Wl$(COMMA)-mllvm -Wl$(COMMA)-enable-ipra -Wl$(COMMA)-Bsymbolic-non-weak-functions) -DLLVM_PROFDAT_FILE=$(INSTRUMENTED_PROF)/clang.profdata)
 
@@ -108,11 +118,20 @@ $(INSTRUMENTED_PROF)/clang.profdata: instrumented
 
 %.bench: % 
 	$(call clang_bench,$(basename $@),$(PWD)/install.dir/$(basename $@)/bin)
-	cd build.dir/clangbench/$(basename $@) && $(RUN_FOR_REMOTE) sed 's/[^ ]*IPRA-exp/\/tmp\/IRPA-exp/g; s/^:.*://g' ./perf_commands.sh > ./perf_commands-copy.sh && $(RUN_FOR_REMOTE) mv ./perf_commands-copy.sh ./perf_commands.sh
+	cd build.dir/clangbench/$(basename $@) && $(RUN_FOR_REMOTE) sed 's/\/[^ ]*IPRA-exp/\/tmp\/IPRA-exp/g; s/^:.*://g;' ./perf_commands.sh > ./perf_commands-copy.sh && \
+				sed ' s/\.cpp\.o -c/\.cpp\.i -E/g; s/^:.*://g;' ./perf_commands.sh > ./preprocess.sh &&  \
+				 $(RUN_FOR_REMOTE) $(LLVM_ROOT_PATH)/../process_cmd < ./perf_commands-copy.sh > ./perf_commands.sh && \
+				 $(RUN_FOR_REMOTE) bash ./preprocess.sh
+	
+# $(COPY_TO_REMOTE) build/benchmarks/clang/llvm-project-llvmorg-14.0.6/
 	$(COPY_TO_REMOTE) build/benchmarks/clang/build.dir/clangbench/$(basename $@)/
-	$(COPY_TO_REMOTE) build/benchmarks/clang/install.dir/$(basename $@)/bin/clang-14
-	cd $(PWD)/install.dir/$(basename $@)/bin && $(RUN_ON_REMOTE) ln -sf ./clang-14 clang++
-	cd build.dir/clangbench/$(basename $@) && $(PERF) stat -o $(basename $@).bench -r5 -- taskset -c 1 bash ./perf_commands.sh
+	$(COPY_TO_REMOTE) build/benchmarks/clang/install.dir/$(basename $@)/
+	cd build.dir/clangbench/$(basename $@) && $(PERF) stat $(PERF_EVENTS) -o $(basename $@).bench -r5 -- taskset -c 1 bash ./perf_commands.sh
+	$(COPY_BACK) $(PWD)/build.dir/clangbench/$(basename $@)/$(basename $@).bench
+	$(RUN_ON_REMOTE) rm -rf /tmp/IPRA-exp/*
+
+%.test-copy-back:
+	$(COPY_BACK) $(PWD)/build.dir/clangbench/$(basename $@)/$(basename $@).bench
 
 llvm-project-$(CLANG_VERSION):
 	wget https://github.com/llvm/llvm-project/archive/refs/tags/$(CLANG_VERSION).zip && unzip $(CLANG_VERSION) && rm -f $(CLANG_VERSION).zip

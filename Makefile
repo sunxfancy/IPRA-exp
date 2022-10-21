@@ -39,6 +39,7 @@ LLVM_ROOT_PATH = $(PWD)/install/llvm
 NCC=$(GOOGLE_WORKSPACE)/google3/third_party/crosstool/v18/llvm_unstable/wrappers/bin/x86_64-grtev5-linux-gnu-clang_proxy
 NCXX=$(GOOGLE_WORKSPACE)/google3/third_party/crosstool/v18/llvm_unstable/wrappers/bin/x86_64-grtev5-linux-gnu-clang_proxy++
 
+PERF_EVENTS:= -e instructions,cycles,L1-icache-misses,iTLB-misses,L1-dcache-loads,L1-dcache-load-misses,dTLB-load-misses,L1-dcache-stores,L1-dcache-store-misses,dTLB-store-misses,branches,branch-misses,page-faults,context-switches,cpu-migrations
 
 ENABLE_IPRA =  -mllvm -enable-ipra
 ENABLE_IPRA_LTO = -Wl,-mllvm -Wl,-enable-ipra
@@ -54,11 +55,13 @@ REMOTE_PERF:=true
 ifeq ($(REMOTE_PERF), true)
 	COPY_TO_REMOTE:=bash $(PWD)/scripts/copy-to-test-machine.sh
 	RUN_FOR_REMOTE:=
+	COPY_BACK:=bash $(PWD)/scripts/copy-back.sh
 	RUN_ON_REMOTE:=bash $(PWD)/scripts/run-on-remote.sh
 	PERF:=$(RUN_ON_REMOTE) perf
 else
 	COPY_TO_REMOTE:= echo "skip running - " 
 	RUN_FOR_REMOTE:= echo "skip running - " 
+	COPY_BACK:= echo "skip running - " 
 	RUN_ON_REMOTE:= echo "skip running - " 
 	PERF:=perf
 endif 
@@ -155,6 +158,12 @@ install/counter: utils/counter.go
 	mkdir -p install
 	cd utils && go build counter.go
 	mv utils/counter install/counter
+
+install/process_cmd: utils/process_cmd.go
+	mkdir -p install
+	cd utils && go build process_cmd.go
+	mv utils/process_cmd install/process_cmd
+
 
 install/clang_proxy: utils/clang_proxy.go build/llvm
 	mkdir -p install
