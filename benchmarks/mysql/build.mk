@@ -127,23 +127,23 @@ $(INSTRUMENTED_PROF)/default.profdata: instrumented
 
 
 $(DBT2_NAME)/README-MYSQL: $(DBT2_NAME).tar.gz $(mkfile_path)/packages/dbt2.patch
-	tar xzvf $<
+	tar xzf $<
 	patch -p1 < $(lastword $^)
 	touch $@
 
 $(MYSQL_PACKAGE_NAME):
-	wget https://dev.mysql.com/get/Downloads/MySQL-8.0/$(MYSQL_PACKAGE_NAME)
+	wget -q https://dev.mysql.com/get/Downloads/MySQL-8.0/$(MYSQL_PACKAGE_NAME)
 
 $(MYSQL_NAME)/README: $(MYSQL_PACKAGE_NAME) $(OPENSSL_NAME)/install $(NCURSE_NAME)/install $(mkfile_path)/packages/mysql.patch
-	tar xzvf $<
+	tar xzf $<
 	cd "$(MYSQL_NAME)" ; patch -p1 < "$(lastword $^)"
 	touch $@
 
 $(OPENSSL_PACKAGE_NAME):
-	wget https://www.openssl.org/source/$(OPENSSL_PACKAGE_NAME)
+	wget -q https://www.openssl.org/source/$(OPENSSL_PACKAGE_NAME)
 
 $(OPENSSL_NAME)/README: $(OPENSSL_PACKAGE_NAME)
-	tar xzvf $<
+	tar xzf $<
 	touch $@
 
 $(OPENSSL_NAME)/install: $(OPENSSL_NAME)/README
@@ -152,8 +152,8 @@ $(OPENSSL_NAME)/install: $(OPENSSL_NAME)/README
 	cd $(OPENSSL_SOURCE) && make install_sw
 
 $(NCURSE_NAME)/README:
-	wget https://ftp.gnu.org/pub/gnu/ncurses/$(NCURSE_PACKAGE_NAME)
-	tar xzvf $(NCURSE_PACKAGE_NAME)
+	wget -q https://ftp.gnu.org/pub/gnu/ncurses/$(NCURSE_PACKAGE_NAME)
+	tar xzf $(NCURSE_PACKAGE_NAME)
 	touch $@
 
 $(NCURSE_NAME)/install: $(NCURSE_NAME)/README

@@ -23,7 +23,7 @@ define build_clang
 	rm -f $(PWD)/build.dir/$(1).count-push-pop 
 	touch $(PWD)/build.dir/$(1).count-push-pop
 	cd build.dir/$(1) && cmake -G Ninja $(LLVM) \
-		-DCMAKE_BUILD_TYPE=RelWithDebInfo \
+		-DCMAKE_BUILD_TYPE=Release \
 		-DLLVM_OPTIMIZED_TABLEGEN=ON \
 		-DLLVM_TARGETS_TO_BUILD="X86" \
 		-DLLVM_ENABLE_RTTI=OFF \
@@ -85,7 +85,7 @@ define gen_perfdata
 $(1)$(2).perfdata: $(1) 
 	$(call switch_binary,$(1),$(2))
 	$(call copy_to_server,$(1),$(2))
-	cd bench.dir && $(PERF) record -e cycles:u -j any,u -o ../$$@ -- taskset -c 1 bash ./perf_commands_remote.sh
+	cd bench.dir && $(PERF) record -e cycles:u -j any,u -o ../$$@ -- taskset -c 1 bash ./perf_commands.sh
 	$(COPY_BACK) $(PWD)/$$@
 	$(RUN_ON_REMOTE) rm -rf $(PWD)/bench.dir/
 
@@ -96,7 +96,7 @@ define gen_bench
 $(1)$(2).bench: $(1)
 	$(call switch_binary,$(1),$(2))
 	$(call copy_to_server,$(1),$(2))
-	cd bench.dir && $(PERF) stat $(PERF_EVENTS) -o ../$$@ -r5 -- taskset -c 1 bash ./perf_commands_remote.sh
+	cd bench.dir && $(PERF) stat $(PERF_EVENTS) -o ../$$@ -r5 -- taskset -c 1 bash ./perf_commands.sh
 	$(COPY_BACK) $(PWD)/$$@
 	$(RUN_ON_REMOTE) rm -rf $(PWD)/bench.dir/
 
@@ -120,10 +120,10 @@ $(INSTRUMENTED_PROF)/default.profdata: instrumented
 	cd bench.dir && ./perf_commands.sh
 	cd $(INSTRUMENTED_PROF) && $(LLVM_BIN)/llvm-profdata merge -output=default.profdata *
 
-
+gen_profdata: $(INSTRUMENTED_PROF)/default.profdata
 
 llvm-project-$(CLANG_VERSION):
-	wget https://github.com/llvm/llvm-project/archive/refs/tags/$(CLANG_VERSION).zip && unzip $(CLANG_VERSION) && rm -f $(CLANG_VERSION).zip
+	wget -q https://github.com/llvm/llvm-project/archive/refs/tags/$(CLANG_VERSION).zip && unzip -q $(CLANG_VERSION) && rm -f $(CLANG_VERSION).zip
 
 %.lbench: %
 	$(call switch_binary,$(basename $@))

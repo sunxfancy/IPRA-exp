@@ -11,7 +11,7 @@ PGO_THIN_FLAVORS := pgo-thin $(foreach f,$(FDOIPRA_FLAVORS),pgo-thin-$(f)) pgo-t
 FLAVORS := $(PGO_FULL_FLAVORS)
 
 COMPILER_FLAGS:=-fuse-ld=lld -fbasic-block-sections=labels -Qunused-arguments -funique-internal-linkage-names -fno-optimize-sibling-calls -mllvm -fast-isel=false -fsplit-machine-functions
-LINKER_FLAGS:=-fuse-ld=lld -Wl,--lto-basic-block-sections=labels -Wl,-z,keep-text-section-prefix -Wl,--build-id -fno-optimize-sibling-calls -Wl,-mllvm -Wl,-fast-isel=false -fsplit-machine-functions -Wl,-Bsymbolic-non-weak-functions
+LINKER_FLAGS:=-fuse-ld=lld -static-libgcc -static-libstdc++ -Wl,--lto-basic-block-sections=labels -Wl,-z,keep-text-section-prefix -Wl,--build-id -fno-optimize-sibling-calls -Wl,-mllvm -Wl,-fast-isel=false -fsplit-machine-functions -Wl,-Bsymbolic-non-weak-functions
 
 COMPILER_FLAGS_IPRA:= -mllvm -enable-ipra
 LINKER_FLAGS_IPRA:= -Wl,-mllvm -Wl,-enable-ipra

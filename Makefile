@@ -20,6 +20,9 @@ COUNTSUM:= $(PWD)/install/count-sum
 FDO:= $(PWD)/install/FDO
 CREATE_REG:= $(PWD)/install/autofdo/create_reg_prof
 
+HPCC_HOST:=cluster.hpcc.ucr.edu
+HPCC_USER:=xsun042
+
 REMOTE_PERF:=false
 ifeq ($(REMOTE_PERF), true)
 	COPY_TO_REMOTE:=bash $(PWD)/scripts/copy-to-test-machine.sh
@@ -39,11 +42,14 @@ endif
 # MOLD:= mold -run
 MOLD:= 
 
-.PHONY: build check-tools 
+.PHONY: build check-tools install/llvm install/autofdo install/FDO install/counter install/clang_proxy install/count-sum
 build: check-tools  install/llvm install/autofdo install/FDO install/counter install/clang_proxy install/count-sum
 
-BUILD_PATH = build
-INSTALL = install
+# BUILD_PATH = /tmp/IPRA-exp
+BUILD_PATH = /scratch
+
+# BUILD_PATH = $(PWD)/build
+INSTALL_PATH = $(PWD)/install
 
 define tool-available
 	$(eval $(1) := $(shell which $(2)))
@@ -78,20 +84,25 @@ endef
 
 
 install/autofdo: build/autofdo
-	mold -run cmake --build $(BUILD_PATH)/autofdo --config ${AUTOFDO_BUILD_TYPE} -j $(shell nproc) --target install
+	$(MOLD) cd $(BUILD_PATH)/autofdo && ninja 
+	cd $(BUILD_PATH)/autofdo && ninja install
 	mkdir -p install/autofdo
-	cp $(BUILD_PATH)/autofdo/create_llvm_prof install/autofdo/create_llvm_prof
+# cp $(BUILD_PATH)/autofdo/create_llvm_prof install/autofdo/create_llvm_prof
 	cp $(BUILD_PATH)/autofdo/profile_merger install/autofdo/profile_merger
 	cp $(BUILD_PATH)/autofdo/sample_merger install/autofdo/sample_merger
 	cp $(BUILD_PATH)/autofdo/reg_profiler install/autofdo/reg_profiler
 	cp $(BUILD_PATH)/autofdo/hot_list_creator install/autofdo/hot_list_creator
 
+libgmock:
+	$(MOLD) cmake --build $(BUILD_PATH)/autofdo --config ${AUTOFDO_BUILD_TYPE} -j $(shell nproc) --target lib/libgmock.so.1.10.0
+
+
 build/autofdo: autofdo install/llvm
 	mkdir -p build
 	cmake -G Ninja -B $(BUILD_PATH)/autofdo -S autofdo \
 		-DCMAKE_BUILD_TYPE=${AUTOFDO_BUILD_TYPE} \
-		-DLLVM_PATH=${PWD}/install/llvm \
-		-DCMAKE_INSTALL_PREFIX=$(BUILD_PATH)/autofdo 
+		-DLLVM_PATH=$(INSTALL_PATH)/llvm \
+		-DCMAKE_INSTALL_PREFIX=$(INSTALL_PATH)/autofdo 
 
 install/llvm: $(BUILD_PATH)/llvm/build.ninja
 	mkdir -p install/llvm
@@ -110,7 +121,7 @@ $(BUILD_PATH)/llvm/build.ninja: LLVM-IPRA
 		-DLLVM_TARGETS_TO_BUILD="X86" \
 		-DLLVM_ENABLE_RTTI=OFF \
 		-DLLVM_ENABLE_PROJECTS="clang;lld;llvm;compiler-rt;bolt" \
-		-DCMAKE_INSTALL_PREFIX=install/llvm \
+		-DCMAKE_INSTALL_PREFIX=$(INSTALL_PATH)/llvm \
 		-DLLVM_CCACHE_BUILD=OFF \
 		-DCMAKE_EXPORT_COMPILE_COMMANDS=1
 
@@ -118,45 +129,61 @@ $(BUILD_PATH)/llvm/build.ninja: LLVM-IPRA
 # -DCMAKE_CXX_COMPILER=clang++ \
 
 install/FDO: FDO
-	mkdir -p install 
+	mkdir -p $(INSTALL_PATH) 
 	cd FDO && go build .
-	mv FDO/FDO install/FDO
+	mv FDO/FDO $(INSTALL_PATH)/FDO
 
 install/counter: utils/counter.go
-	mkdir -p install
+	mkdir -p $(INSTALL_PATH)
 	cd utils && go build counter.go
-	mv utils/counter install/counter
+	mv utils/counter $(INSTALL_PATH)/counter
 
 install/process_cmd: utils/process_cmd.go
-	mkdir -p install
+	mkdir -p $(INSTALL_PATH)
 	cd utils && go build process_cmd.go
-	mv utils/process_cmd install/process_cmd
+	mv utils/process_cmd $(INSTALL_PATH)/process_cmd
 
 
 install/clang_proxy: utils/clang_proxy.go build/llvm
-	mkdir -p install
+	mkdir -p $(INSTALL_PATH)
 	cd utils && go build clang_proxy.go
-	mv utils/clang_proxy install/llvm/bin/clang_proxy
-	rm -f install/llvm/bin/clang_proxy++ 
-	ln -s ./clang_proxy install/llvm/bin/clang_proxy++
+	mv utils/clang_proxy $(INSTALL_PATH)/llvm/bin/clang_proxy
+	rm -f $(INSTALL_PATH)/llvm/bin/clang_proxy++ 
+	ln -s ./clang_proxy $(INSTALL_PATH)/llvm/bin/clang_proxy++
 
 
 
 install/count-sum: check-tools utils/count-sum.cpp
-	g++ -std=c++17 -O3 utils/count-sum.cpp -o install/count-sum
+	g++ -std=c++17 -O3 utils/count-sum.cpp -o $(INSTALL_PATH)/count-sum
 
 download/singularity-ce:
-	export VERSION=3.9.3 && cd $(BUILD) && \
-	wget https://github.com/sylabs/singularity/releases/download/v${VERSION}/singularity-ce-${VERSION}.tar.gz && \
-	tar -xzf singularity-ce-${VERSION}.tar.gz 
+	export VERSION=3.9.3 && mkdir -p $(BUILD_PATH) && cd $(BUILD_PATH) && \
+	wget https://github.com/sylabs/singularity/releases/download/v$${VERSION}/singularity-ce-$${VERSION}.tar.gz && \
+	tar -xzf singularity-ce-$${VERSION}.tar.gz 
 
-build/singularity-ce:
-	cd $(BUILD)/singularity-ce-${VERSION} && \
+build/singularity-ce: download/singularity-ce
+	export VERSION=3.9.3 && cd $(BUILD_PATH)/singularity-ce-$${VERSION} && \
 	./mconfig && make -C builddir -j8 && sudo make -C builddir install
 
 singularity/image:
-	cd singularity && sudo singularity build image IPRA.def
+	cd singularity && sudo singularity build -F image.sif IPRA.def
 
+# upload to HPCC
+upload:
+	scp -pr $(INSTALL_PATH) $(HPCC_USER)@$(HPCC_HOST):/rhome/xsun042/bigdata/IPRA-exp
+	scp -pr ./benchmarks $(HPCC_USER)@$(HPCC_HOST):/rhome/xsun042/bigdata/IPRA-exp
+	scp -pr ./singularity $(HPCC_USER)@$(HPCC_HOST):/rhome/xsun042/bigdata/IPRA-exp
+	scp -pr ./example $(HPCC_USER)@$(HPCC_HOST):/rhome/xsun042/bigdata/IPRA-exp
+	scp Makefile $(HPCC_USER)@$(HPCC_HOST):/rhome/xsun042/bigdata/IPRA-exp/
+
+upload-bench:
+	scp -pr ./benchmarks $(HPCC_USER)@$(HPCC_HOST):/rhome/xsun042/bigdata/IPRA-exp
+	scp Makefile $(HPCC_USER)@$(HPCC_HOST):/rhome/xsun042/bigdata/IPRA-exp/
+
+hpcc: upload-bench
+	ssh $(HPCC_USER)@$(HPCC_HOST) "cd /rhome/xsun042/bigdata/IPRA-exp && \
+	 id=$$(sbatch benchmarks/hpcc-base.sh) && \
+	 sbatch --dependency=afterok:$${id} benchmarks/hpcc.sh"
 
 copy-google-lib:
 	mkdir -p install/llvm/lib/gcc
