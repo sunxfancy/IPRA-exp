@@ -1,4 +1,5 @@
 mkfile_path := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
+BENCHMARK=gcc
 include $(mkfile_path)../common.mk
 GCC_VERSION=gcc-10.4.0
 
@@ -6,14 +7,18 @@ gen_compiler_flags =CFLAGS=$(1) CXXFLAGS=$(1)
 gen_linker_flags   =LDFLAGS=$(1)
 COMMA := ,
 
+MAIN_BIN = gcc/cc1
+BUILD_ACTION=build_gcc
+BUILD_TARGET=
+
 define switch_binary
-	rm -f install.dir/libexec/gcc/x86_64-linux-gnu/10.4.0/cc1
-	ln -s $(PWD)/build.dir/$(1)/gcc/cc1$(2) install.dir/libexec/gcc/x86_64-linux-gnu/10.4.0/cc1
+	rm -f $(INSTALL_DIR)/libexec/gcc/x86_64-linux-gnu/10.4.0/cc1
+	ln -s $(PWD)/$(1)/$(MAIN_BIN)$(2) $(INSTALL_DIR)/libexec/gcc/x86_64-linux-gnu/10.4.0/cc1
 endef
 
 define build_gcc
-	rm -f /tmp/count-push-pop.txt 
-	touch /tmp/count-push-pop.txt
+	rm -f $(PWD)/$(1).count-push-pop 
+	touch $(PWD)/$(1).count-push-pop
 	mkdir -p build.dir/$(1)
 	mkdir -p install.dir/$(1)
 	cd build.dir/$(1) && unset C_INCLUDE_PATH CPLUS_INCLUDE_PATH CFLAGS CXXFLAGS && \
@@ -40,13 +45,17 @@ define build_gcc
 	cd build.dir/$(1) && CLANG_PROXY_FOCUS=cc1 \
 		CLANG_PROXY_ARGS="$(4)" CLANG_PROXY_VAR="$(5)" \
 		time -o time.log make $(3) -j $(shell nproc) > build.log
-	echo "---------$(1)---------" >> ../gcc.output
-	cat /tmp/count-push-pop.txt | $(COUNTSUM) >> ../gcc.output 
+	if [ ! -d "$(INSTALL_DIR)/libexec" ]; then \
+		cd $(BUILD_DIR)/$(1) && make all-gcc -j $(shell nproc) -v >>  $(PWD)/$(1)/build.log; \
+	fi 
 	echo "---------$(1)---------" >> ../gcc.raw
-	cat /tmp/count-push-pop.txt >> ../gcc.raw 
-
+	cat $(PWD)/$(1).count-push-pop.txt >> ../gcc.raw 
+	echo "---------$(1)---------" >> ../gcc.output
+	cat $(PWD)/$(1).count-push-pop.txt | $(COUNTSUM) >> ../gcc.output 
+	
+	$(call mv_binary,$(1))
 	$(call switch_binary,$(1))
-	$(call mv_binary)
+	touch $@
 endef
 
 define run_bench
@@ -83,7 +92,7 @@ define gen_perfdata
 $(1)$(2).perfdata: $(1) 
 	$(call switch_binary,$(1),$(2))
 	$(call copy_to_server,$(1),$(2))
-	cd bench.dir && $(PERF) record -e cycles:u -j any,u -o ../$$@ -- taskset -c 1 bash ./perf_commands_remote.sh
+	cd bench.dir && $(PERF) record -e cycles:u -j any,u -o ../$$@ -- $(TASKSET) bash ./perf_commands_remote.sh
 	$(COPY_BACK) $(PWD)/$$@
 	$(RUN_ON_REMOTE) rm -rf $(PWD)/bench.dir/
 
@@ -94,7 +103,7 @@ define gen_bench
 $(1)$(2).bench: $(1)
 	$(call switch_binary,$(1),$(2))
 	$(call copy_to_server,$(1),$(2))
-	cd bench.dir && $(PERF) stat $(PERF_EVENTS) -o ../$$@ -r5 -- taskset -c 1 bash ./perf_commands_remote.sh
+	cd bench.dir && $(PERF) stat $(PERF_EVENTS) -o ../$$@ -r5 -- $(TASKSET) bash ./perf_commands_remote.sh
 	$(COPY_BACK) $(PWD)/$$@
 	$(RUN_ON_REMOTE) rm -rf $(PWD)/bench.dir/
 
@@ -113,14 +122,16 @@ debug-makefile:
 instrumented: gcc-releases-$(GCC_VERSION)
 	$(call build_gcc,$@,$(call gen_build_flags_ins,,,-fprofile-generate=$(INSTRUMENTED_PROF),-fprofile-generate=$(INSTRUMENTED_PROF)),all-gcc)
 
-$(INSTRUMENTED_PROF)/default.profdata:  instrumented
+instrumented.profdata:  instrumented
+	rm -rf $(INSTRUMENTED_PROF)
+	$(call switch_binary,instrumented)
 	$(call run_bench,instrumented,$(PWD)/build.dir/instrumented/gcc)
-	cd build.dir/bench/instrumented && ./perf_commands.sh
-	cd $(INSTRUMENTED_PROF) && $(LLVM_BIN)/llvm-profdata merge -output=default.profdata *
+	cd $(BENCH_DIR) && ./perf_commands.sh
+	cd $(INSTRUMENTED_PROF) && $(LLVM_BIN)/llvm-profdata merge -output=$(PWD)/instrumented.profdata *
 
 
 gcc-releases-$(GCC_VERSION):
-	wget https://github.com/gcc-mirror/gcc/archive/refs/tags/releases/$(GCC_VERSION).zip && unzip $(GCC_VERSION) && rm -f $(GCC_VERSION).zip
+	wget https://github.com/gcc-mirror/gcc/archive/refs/tags/releases/$(GCC_VERSION).zip && unzip -q -o $(GCC_VERSION) && rm -f $(GCC_VERSION).zip
 	cd gcc-releases-$(GCC_VERSION) && contrib/download_prerequisites
 	cd gcc-releases-$(GCC_VERSION) && find . -type f -name configure -exec sed -i 's/\$$CC -print-multi-os-directory/gcc -print-multi-os-directory/g' {} \;
 	cd gcc-releases-$(GCC_VERSION) && find . -type f -name configure -exec sed -i 's/\$$CXX -print-multi-os-directory/gcc -print-multi-os-directory/g' {} \;
@@ -140,8 +151,8 @@ gcc-releases-$(GCC_VERSION):
 	$(COPY_TO_REMOTE) $(PWD)/build.dir/bench/$(basename $@)/
 	$(COPY_TO_REMOTE) $(PWD)/build.dir/$(basename $@)/gcc/xgcc
 	$(COPY_TO_REMOTE) $(PWD)/build.dir/$(basename $@)/gcc/cc1
-	cd build.dir/bench/$(basename $@) && $(PERF) stat $(PERF_EVENTS) -o $(basename $@).bench -r5 -- taskset -c 1 bash ./perf_commands.sh
+	cd build.dir/bench/$(basename $@) && $(PERF) stat $(PERF_EVENTS) -o $(basename $@).bench -r5 -- $(TASKSET) bash ./perf_commands.sh
 	$(COPY_BACK) $(PWD)/build.dir/bench/$(basename $@)/$(basename $@).bench
-	cd build.dir/bench/$(basename $@) && $(PERF) record -e cycles:u -j any,u -o $(basename $@).perfdata -- taskset -c 1 bash ./perf_commands.sh
+	cd build.dir/bench/$(basename $@) && $(PERF) record -e cycles:u -j any,u -o $(basename $@).perfdata -- $(TASKSET) bash ./perf_commands.sh
 	$(COPY_BACK) $(PWD)/build.dir/bench/$(basename $@)/$(basename $@).perfdata
 	$(RUN_ON_REMOTE) rm -rf /tmp/IPRA-exp/*

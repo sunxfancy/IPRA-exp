@@ -59,7 +59,7 @@ $(INSTRUMENTED_PROF)/dparser.profdata:  instrumented
 	cd $(INSTRUMENTED_PROF) && $(LLVM_BIN)/llvm-profdata merge -output=dparser.profdata *
 
 %.bench: %
-	cd build.dir/$(basename $@) && perf stat -o $(basename $@).bench -r5 -- taskset -c 1 bash $(mkfile_path)scripts.sh
+	cd build.dir/$(basename $@) && perf stat -o $(basename $@).bench -r5 -- $(TASKSET) bash $(mkfile_path)scripts.sh
 
 dparser-master:
-	wget https://github.com/jplevyak/dparser/archive/refs/heads/master.zip && unzip ./master.zip && rm ./master.zip
+	wget https://github.com/jplevyak/dparser/archive/refs/heads/master.zip && unzip -q -o ./master.zip && rm ./master.zip

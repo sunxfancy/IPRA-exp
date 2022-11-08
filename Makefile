@@ -23,32 +23,37 @@ CREATE_REG:= $(PWD)/install/autofdo/create_reg_prof
 HPCC_HOST:=cluster.hpcc.ucr.edu
 HPCC_USER:=xsun042
 
+TASKSET:=
+# TASKSET:=$(TASKSET)
+
 REMOTE_PERF:=false
+PERF_PATH:=/usr/lib/linux-tools/5.4.0-131-generic/perf
+# PERF_PATH:=/usr/lib/linux-hwe-tools-4.18.0-21/perf
 ifeq ($(REMOTE_PERF), true)
 	COPY_TO_REMOTE:=bash $(PWD)/scripts/copy-to-test-machine.sh
 	RUN_FOR_REMOTE:=
 	COPY_BACK:=bash $(PWD)/scripts/copy-back.sh
 	RUN_ON_REMOTE:=bash $(PWD)/scripts/run-on-remote.sh
-	PERF:=$(RUN_ON_REMOTE) perf
+	PERF:=$(RUN_ON_REMOTE) $(PERF_PATH)
 else
 	COPY_TO_REMOTE:= echo "skip running - " 
 	RUN_FOR_REMOTE:= echo "skip running - " 
 	COPY_BACK:= echo "skip running - " 
 	RUN_ON_REMOTE:= echo "skip running - " 
-	PERF:=perf
+	PERF:=$(PERF_PATH)
 endif 
 
 # Use mold to speed up linking
 # MOLD:= mold -run
 MOLD:= 
 
-.PHONY: build check-tools install/llvm install/autofdo install/FDO install/counter install/clang_proxy install/count-sum
-build: check-tools  install/llvm install/autofdo install/FDO install/counter install/clang_proxy install/count-sum
+.PHONY: build check-tools install/llvm install/autofdo install/counter install/clang_proxy install/count-sum
+build: check-tools  install/llvm install/autofdo install/counter install/clang_proxy install/count-sum
 
 # BUILD_PATH = /tmp/IPRA-exp
-BUILD_PATH = /scratch
-
-# BUILD_PATH = $(PWD)/build
+# BUILD_PATH = /scratch
+OUTPUT_PATH = $(PWD)/build
+BUILD_PATH = $(PWD)/tmp
 INSTALL_PATH = $(PWD)/install
 
 define tool-available
@@ -144,7 +149,7 @@ install/process_cmd: utils/process_cmd.go
 	mv utils/process_cmd $(INSTALL_PATH)/process_cmd
 
 
-install/clang_proxy: utils/clang_proxy.go build/llvm
+install/clang_proxy: utils/clang_proxy.go $(BUILD_PATH)/llvm/build.ninja
 	mkdir -p $(INSTALL_PATH)
 	cd utils && go build clang_proxy.go
 	mv utils/clang_proxy $(INSTALL_PATH)/llvm/bin/clang_proxy
@@ -175,6 +180,9 @@ upload:
 	scp -pr ./singularity $(HPCC_USER)@$(HPCC_HOST):/rhome/xsun042/bigdata/IPRA-exp
 	scp -pr ./example $(HPCC_USER)@$(HPCC_HOST):/rhome/xsun042/bigdata/IPRA-exp
 	scp Makefile $(HPCC_USER)@$(HPCC_HOST):/rhome/xsun042/bigdata/IPRA-exp/
+
+upload-image:
+	scp -pr ./singularity $(HPCC_USER)@$(HPCC_HOST):/rhome/xsun042/bigdata/IPRA-exp
 
 upload-bench:
 	scp -pr ./benchmarks $(HPCC_USER)@$(HPCC_HOST):/rhome/xsun042/bigdata/IPRA-exp

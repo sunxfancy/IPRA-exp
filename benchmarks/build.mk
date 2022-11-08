@@ -5,7 +5,7 @@ benchmarks: benchmarks/clang/regprof benchmarks/mysql/regprof benchmarks/gcc/reg
 
 benchmarks-build: benchmarks/clang/build benchmarks/mysql/build benchmarks/gcc/build # benchmarks/SPEC
 
-FDOIPRA_FLAVORS := fdoipra fdoipra2 fdoipra3 bfdoipra bfdoipra2 bfdoipra3 ipra
+FDOIPRA_FLAVORS := fdoipra fdoipra2 fdoipra3 bfdoipra bfdoipra2 bfdoipra3
 PGO_FULL_FLAVORS := pgo-full $(foreach f,$(FDOIPRA_FLAVORS),pgo-full-$(f)) pgo-full-ipra
 PGO_THIN_FLAVORS := pgo-thin $(foreach f,$(FDOIPRA_FLAVORS),pgo-thin-$(f)) pgo-thin-ipra
 FLAVORS := $(PGO_FULL_FLAVORS)
@@ -50,11 +50,11 @@ SUBDIRS := $(patsubst %/build.mk,%,$(wildcard benchmarks/*/build.mk))
 .PHONY: $(SUBDIRS)
 
 $(SUBDIRS):
-	mkdir -p $(BUILD_PATH)/$@
-	BENCHMARK=$@ $(MAKE) -C $(BUILD_PATH)/$@ -f $(PWD)/$@/build.mk
+	mkdir -p $(OUTPUT_PATH)/$@
+	$(MAKE) -C $(OUTPUT_PATH)/$@ -f $(PWD)/$@/build.mk 
 
 benchmarks/%: 
-	mkdir -p $(BUILD_PATH)/$(dir $@)
-	BENCHMARK=$(dir $@) $(MAKE) -C $(BUILD_PATH)/$(dir $@) -f $(PWD)/$(dir $@)build.mk $(notdir $@)
+	mkdir -p $(OUTPUT_PATH)/$(dir $@)
+	$(MAKE) -C $(OUTPUT_PATH)/$(dir $@) -f $(PWD)/$(dir $@)build.mk $(notdir $@) 
 
 

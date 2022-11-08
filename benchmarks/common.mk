@@ -1,24 +1,24 @@
 PWD := $(shell pwd)
 
-BUILD_DIR:=$(PWD)/build.dir
-INSTALL_DIR:=$(PWD)/install.dir
-BENCH_DIR:=$(PWD)/bench.dir
+BUILD_DIR:=$(BUILD_PATH)/$(BENCHMARK)/build.dir
+INSTALL_DIR:=$(BUILD_PATH)/$(BENCHMARK)/install.dir
+BENCH_DIR:=$(BUILD_PATH)/$(BENCHMARK)/bench.dir
 
-INSTRUMENTED_PROF=$(PWD)/build.dir/instrumented/profiles
+INSTRUMENTED_PROF=$(BUILD_DIR)/instrumented/profiles
 HOT_LIST_VAR:=1 3 5 10
 RATIO_VAR:=10 20
-PGO_FULL_HOT_LIST=$(foreach j,$(HOT_LIST_VAR),build.dir/pgo-full.$(j).hot_list)
-PGO_THIN_HOT_LIST=$(foreach j,$(HOT_LIST_VAR),build.dir/pgo-thin.$(j).hot_list)
-HOT_LIST=-mllvm -fdoipra-hot-list=$(PWD)/build.dir/pgo-$(1).$(2).hot_list
-HOT_LIST_LD=-Wl,-mllvm -Wl,-fdoipra-hot-list=$(PWD)/build.dir/pgo-$(1).$(2).hot_list
+PGO_FULL_HOT_LIST=$(foreach j,$(HOT_LIST_VAR),pgo-full.$(j).hot_list)
+PGO_THIN_HOT_LIST=$(foreach j,$(HOT_LIST_VAR),pgo-thin.$(j).hot_list)
+HOT_LIST=-mllvm -fdoipra-hot-list=$(PWD)/pgo-$(1).$(2).hot_list
+HOT_LIST_LD=-Wl,-mllvm -Wl,-fdoipra-hot-list=$(PWD)/pgo-$(1).$(2).hot_list
 GEN_HL=$(call HOT_LIST,$(1),$(2)) $(call HOT_LIST_LD,$(1),$(2))
 COMMA := ,
 
 # call GEN_VAR,pgo-thin-fdoipra3,thin,10
-GEN_VAR=$(foreach j,$(HOT_LIST_VAR),-Wl,-mllvm -Wl,-fdoipra-ccr=$(3).0 $(call GEN_HL,$(2),$(j)) -Wl,-mllvm -Wl,-fdoipra-psi=$(PWD)/build.dir/$(1).$(j)-$(3).psi;)
+GEN_VAR=$(foreach j,$(HOT_LIST_VAR),-Wl,-mllvm -Wl,-fdoipra-ccr=$(3).0 $(call GEN_HL,$(2),$(j)) -Wl,-mllvm -Wl,-fdoipra-psi=$(PWD)/$(1).$(j)-$(3).psi;)
 GEN_VARS=$(foreach j,$(RATIO_VAR),$(call GEN_VAR,$(1),$(2),$(j)))
 
-GEN_ARGS=-Wl$(COMMA)-mllvm -Wl$(COMMA)-count-push-pop=$(PWD)/build.dir/$(1).count-push-pop -Wl$(COMMA)-mllvm -Wl$(COMMA)-fdoipra-psi=$(PWD)/build.dir/$(1).psi
+GEN_ARGS=-Wl$(COMMA)-mllvm -Wl$(COMMA)-count-push-pop=$(PWD)/$(1).count-push-pop -Wl$(COMMA)-mllvm -Wl$(COMMA)-fdoipra-psi=$(PWD)/$(1).psi
 
 common_compiler_flags := $(COMPILER_FLAGS) 
 common_linker_flags := $(LINKER_FLAGS)
@@ -68,39 +68,39 @@ define gen_reg_compare
 $(2)$(3).regcompare: $(1).perfdata $(2)$(3).perfdata $(2)$(3).ncsr
 	echo "baseline " $(1)
 	$(REG_PROFILER) \
-		--binary="$(PWD)/build.dir/$(1)/$(MAIN_BIN)" \
+		--binary="$(PWD)/$(1)/$(MAIN_BIN)" \
 		--profile="$(PWD)/$(1).perfdata" \
 		--namelist="$(PWD)/$(2)$(3).ncsr" 
 	$(REG_PROFILER) \
-		--binary="$(PWD)/build.dir/$(1)/$(MAIN_BIN)" \
+		--binary="$(PWD)/$(1)/$(MAIN_BIN)" \
 		--profile="$(PWD)/$(1).perfdata" \
 		--namelist="$(PWD)/$(2)$(3).ncsr" \
 		--not_in_list
 	echo "new method " $(2)$(3)
 	$(REG_PROFILER) \
-		--binary="$(PWD)/build.dir/$(2)/$(MAIN_BIN)$(3)" \
+		--binary="$(PWD)/$(2)/$(MAIN_BIN)$(3)" \
 		--profile="$(PWD)/$(2)$(3).perfdata" \
 		--namelist="$(PWD)/$(2)$(3).ncsr" 
 	$(REG_PROFILER) \
-		--binary="$(PWD)/build.dir/$(2)/$(MAIN_BIN)$(3)" \
+		--binary="$(PWD)/$(2)/$(MAIN_BIN)$(3)" \
 		--profile="$(PWD)/$(2)$(3).perfdata" \
 		--namelist="$(PWD)/$(2)$(3).ncsr" \
 		--not_in_list
 
 $(2)$(3).ncsr: $(2)
-	sed -n 's/\* \([^ ]*\).*/\1/gp' $(PWD)/build.dir/$(2)$(3).psi > $(PWD)/$(2)$(3).ncsr
+	sed -n 's/\* \([^ ]*\).*/\1/gp' $(PWD)/$(2)$(3).psi > $(PWD)/$(2)$(3).ncsr
 
 endef
 
 #(name, variant) e.g (pgo-full-fdoipra,1)
 define gen_hot_list
 
-build.dir/$(1).$(2).hot_list build.dir/$(1).$(2).detail: $(1).perfdata
+$(1).$(2).hot_list $(1).$(2).detail: $(1).perfdata
 	$(CREATE_REG_PROF) \
-		--binary="$(PWD)/build.dir/$(1)/$(MAIN_BIN)" \
+		--binary="$(PWD)/$(1)/$(MAIN_BIN)" \
 		--profile="$(PWD)/$(1).perfdata" \
-		--output="$(PWD)/build.dir/$(1).$(2).hot_list" \
-		--detail="$(PWD)/build.dir/$(1).$(2).detail" \
+		--output="$(PWD)/$(1).$(2).hot_list" \
+		--detail="$(PWD)/$(1).$(2).detail" \
 		--hot_threshold=$(2)
 
 endef
@@ -110,7 +110,7 @@ define gen_regprof
 
 $(call gen_header,$(1),$(2),regprof,.perfdata)
 	$(REG_PROFILER) \
-		--binary="$(PWD)/build.dir/$(1)/$(MAIN_BIN)$(2)" \
+		--binary="$(PWD)/$(1)/$(MAIN_BIN)$(2)" \
 		--profile="$(PWD)/$(1)$(2).perfdata" | tee $$@
 
 endef
@@ -132,10 +132,10 @@ endef
  #(fdoname, lto)
 define gen_pgo_target
 
-pgo-$(2)-$(1): $(INSTRUMENTED_PROF)/default.profdata $(PGO_$(call UPCASE,$(2))_HOT_LIST)
+pgo-$(2)-$(1): instrumented.profdata $(PGO_$(call UPCASE,$(2))_HOT_LIST)
 	$(call $(BUILD_ACTION),$$@,\
 		$(call gen_build_flags,$(1),pgo-$(2)-$(1))\
-		,$(BUILD_TARGET)\
+		,$$(BUILD_TARGET)\
 		,$(call GEN_ARGS,pgo-$(2)-$(1))\
 		,$(call GEN_VARS,pgo-$(2)-$(1),$(2)))
 
@@ -148,10 +148,10 @@ endef
  #(lto)
 define gen_pgo_targets
 
-pgo-$(1): $(INSTRUMENTED_PROF)/default.profdata
+pgo-$(1): instrumented.profdata
 	$(call $(BUILD_ACTION),$$@,\
 		$(call gen_build_flags,,pgo-$(1))\
-		,$(BUILD_TARGET)\
+		,$$(BUILD_TARGET)\
 		,$(call GEN_ARGS,pgo-$(1)))
 $(foreach j,$(HOT_LIST_VAR),$(call gen_hot_list,pgo-$(1),$(j)))
 $(foreach f,$(FDOIPRA_FLAVORS),$(call gen_pgo_target,$(f),$(1)))
@@ -162,13 +162,14 @@ $(call gen_regprof,pgo-$(1))
 endef
 
 define mv_binary
-	-mv  $(PWD)/build.dir/$(1)/$(MAIN_BIN).0  $(PWD)/build.dir/$(1)/$(MAIN_BIN).1-10
-	-mv  $(PWD)/build.dir/$(1)/$(MAIN_BIN).1  $(PWD)/build.dir/$(1)/$(MAIN_BIN).3-10
-	-mv  $(PWD)/build.dir/$(1)/$(MAIN_BIN).2  $(PWD)/build.dir/$(1)/$(MAIN_BIN).5-10
-	-mv  $(PWD)/build.dir/$(1)/$(MAIN_BIN).3  $(PWD)/build.dir/$(1)/$(MAIN_BIN).10-10
-	-mv  $(PWD)/build.dir/$(1)/$(MAIN_BIN).4  $(PWD)/build.dir/$(1)/$(MAIN_BIN).1-20
-	-mv  $(PWD)/build.dir/$(1)/$(MAIN_BIN).5  $(PWD)/build.dir/$(1)/$(MAIN_BIN).3-20
-	-mv  $(PWD)/build.dir/$(1)/$(MAIN_BIN).6  $(PWD)/build.dir/$(1)/$(MAIN_BIN).5-20
-	-mv  $(PWD)/build.dir/$(1)/$(MAIN_BIN).7  $(PWD)/build.dir/$(1)/$(MAIN_BIN).10-20
+	 cp  $(BUILD_DIR)/$(1)/$(MAIN_BIN)    $(PWD)/$(1)/$(MAIN_BIN)
+	-cp  $(BUILD_DIR)/$(1)/$(MAIN_BIN).0  $(PWD)/$(1)/$(MAIN_BIN).1-10
+	-cp  $(BUILD_DIR)/$(1)/$(MAIN_BIN).1  $(PWD)/$(1)/$(MAIN_BIN).3-10
+	-cp  $(BUILD_DIR)/$(1)/$(MAIN_BIN).2  $(PWD)/$(1)/$(MAIN_BIN).5-10
+	-cp  $(BUILD_DIR)/$(1)/$(MAIN_BIN).3  $(PWD)/$(1)/$(MAIN_BIN).10-10
+	-cp  $(BUILD_DIR)/$(1)/$(MAIN_BIN).4  $(PWD)/$(1)/$(MAIN_BIN).1-20
+	-cp  $(BUILD_DIR)/$(1)/$(MAIN_BIN).5  $(PWD)/$(1)/$(MAIN_BIN).3-20
+	-cp  $(BUILD_DIR)/$(1)/$(MAIN_BIN).6  $(PWD)/$(1)/$(MAIN_BIN).5-20
+	-cp  $(BUILD_DIR)/$(1)/$(MAIN_BIN).7  $(PWD)/$(1)/$(MAIN_BIN).10-20
 endef
 
