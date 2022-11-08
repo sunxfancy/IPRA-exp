@@ -3,7 +3,7 @@ BENCHMARK=clang
 include $(mkfile_path)../common.mk
 
 CLANG_VERSION=llvmorg-15.0.3
-LLVM = $(BUILD_PATH)/$(BENCHMARK)/llvm-project-$(CLANG_VERSION)/llvm
+SOURCE = $(BUILD_PATH)/$(BENCHMARK)/llvm-project-$(CLANG_VERSION)/llvm
 
 common_compiler_flags += -fPIC
 
@@ -24,7 +24,7 @@ define build_clang
 	mkdir -p $(INSTALL_DIR)
 	rm -f $(PWD)/$(1).count-push-pop 
 	touch $(PWD)/$(1).count-push-pop
-	cd $(BUILD_DIR)/$(1) && cmake -G Ninja $(LLVM) \
+	cd $(BUILD_DIR)/$(1) && cmake -G Ninja $(SOURCE) \
 		-DCMAKE_BUILD_TYPE=Release \
 		-DLLVM_OPTIMIZED_TABLEGEN=ON \
 		-DLLVM_TARGETS_TO_BUILD="X86" \
@@ -56,13 +56,12 @@ define build_clang
 	
 	$(call switch_binary,$(1))
 	$(call clang_bench,$(INSTALL_DIR)/bin)
-	touch $@
 endef
 
 define clang_bench
 	if [ ! -d "$(BENCH_DIR)" ]; then \
 		mkdir -p $(BENCH_DIR) && \
-		cd $(BENCH_DIR) && cmake -G Ninja $(LLVM) \
+		cd $(BENCH_DIR) && cmake -G Ninja $(SOURCE) \
 			-DCMAKE_BUILD_TYPE=RelWithDebInfo \
 			-DLLVM_TARGETS_TO_BUILD=X86 \
 			-DLLVM_OPTIMIZED_TABLEGEN=On \
@@ -123,8 +122,9 @@ $(eval $(call gen_pgo_targets,full))
 debug-makefile:
 	$(warning $(call gen_pgo_targets,full))
 
-instrumented: $(LLVM)
+instrumented: | $(SOURCE)/.complete
 	$(call build_clang,$@,-DLLVM_BUILD_INSTRUMENTED=ON $(call gen_build_flags_ins),install)
+	touch $@
 
 instrumented.profdata: instrumented
 	rm -rf $(INSTRUMENTED_PROF)
@@ -138,7 +138,7 @@ instrumented.profdata: instrumented
 $(CLANG_VERSION).zip: 
 	wget -q https://github.com/llvm/llvm-project/archive/refs/tags/$(CLANG_VERSION).zip
 
-$(LLVM): $(CLANG_VERSION).zip
+$(SOURCE)/.complete: $(CLANG_VERSION).zip
 	mkdir -p $(BUILD_PATH)/$(BENCHMARK)
 	cd $(BUILD_PATH)/$(BENCHMARK) && unzip -q -o $(PWD)/$<
 	touch $@

@@ -34,12 +34,14 @@ ifeq ($(REMOTE_PERF), true)
 	RUN_FOR_REMOTE:=
 	COPY_BACK:=bash $(PWD)/scripts/copy-back.sh
 	RUN_ON_REMOTE:=bash $(PWD)/scripts/run-on-remote.sh
+	RUN:=bash $(PWD)/scripts/run-on-remote.sh
 	PERF:=$(RUN_ON_REMOTE) $(PERF_PATH)
 else
 	COPY_TO_REMOTE:= echo "skip running - " 
 	RUN_FOR_REMOTE:= echo "skip running - " 
 	COPY_BACK:= echo "skip running - " 
 	RUN_ON_REMOTE:= echo "skip running - " 
+	RUN:=
 	PERF:=$(PERF_PATH)
 endif 
 

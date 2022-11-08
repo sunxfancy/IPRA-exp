@@ -52,8 +52,8 @@ REGCOMPARE_TARGETS:= $(call GEN_FDOIPRA_VARIANT_TARGETS,regcompare)
 NCSR_TARGETS:= $(call GEN_FDOIPRA_VARIANT_TARGETS,ncsr)
 HOTLIST_TARGETS:= $(call GEN_FDOIPRA_VARIANT_TARGETS,hot_list)
 
-.SECONDARY: $(BUILD_TARGETS) $(PERFDATA_TARGETS)  $(BENCH_TARGETS)  $(REGPROF_TARGETS)  $(NCSR_TARGETS) $(HOTLIST_TARGETS)
-.PRECIOUS: $(BUILD_TARGETS) $(PERFDATA_TARGETS)  $(BENCH_TARGETS)  $(REGPROF_TARGETS)
+# .SECONDARY: $(BUILD_TARGETS) $(PERFDATA_TARGETS)  $(BENCH_TARGETS)  $(REGPROF_TARGETS)  $(NCSR_TARGETS) $(HOTLIST_TARGETS)
+# .PRECIOUS: $(BUILD_TARGETS) $(PERFDATA_TARGETS)  $(BENCH_TARGETS)  $(REGPROF_TARGETS)
 all:  $(BUILD_TARGETS) $(PERFDATA_TARGETS)  $(BENCH_TARGETS)  $(REGPROF_TARGETS)
 build:  $(BUILD_TARGETS)
 perfdata:  $(PERFDATA_TARGETS)
@@ -132,12 +132,13 @@ endef
  #(fdoname, lto)
 define gen_pgo_target
 
-pgo-$(2)-$(1): instrumented.profdata $(PGO_$(call UPCASE,$(2))_HOT_LIST)
+pgo-$(2)-$(1): instrumented.profdata $(PGO_$(call UPCASE,$(2))_HOT_LIST)  | $(SOURCE)/.complete
 	$(call $(BUILD_ACTION),$$@,\
 		$(call gen_build_flags,$(1),pgo-$(2)-$(1))\
 		,$$(BUILD_TARGET)\
 		,$(call GEN_ARGS,pgo-$(2)-$(1))\
 		,$(call GEN_VARS,pgo-$(2)-$(1),$(2)))
+	touch $$@
 
 $(foreach j,$(HOT_LIST_VAR),$(call gen_hot_list,pgo-$(2)-$(1),$(j),$(2)))
 $(foreach j,$(COMBINATION),$(call gen_pgo_variant,$(1),$(2),.$(j)))
@@ -148,11 +149,13 @@ endef
  #(lto)
 define gen_pgo_targets
 
-pgo-$(1): instrumented.profdata
+pgo-$(1): instrumented.profdata | $(SOURCE)/.complete
 	$(call $(BUILD_ACTION),$$@,\
 		$(call gen_build_flags,,pgo-$(1))\
 		,$$(BUILD_TARGET)\
 		,$(call GEN_ARGS,pgo-$(1)))
+	touch $$@
+	
 $(foreach j,$(HOT_LIST_VAR),$(call gen_hot_list,pgo-$(1),$(j)))
 $(foreach f,$(FDOIPRA_FLAVORS),$(call gen_pgo_target,$(f),$(1)))
 $(call gen_perfdata,pgo-$(1))

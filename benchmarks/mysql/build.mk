@@ -4,7 +4,7 @@ include $(mkfile_path)../common.mk
 
 MYSQL_NAME := mysql-8.0.30
 MYSQL_PACKAGE_NAME := mysql-boost-8.0.30.tar.gz
-MYSQL_SOURCE := $(BUILD_PATH)/$(BENCHMARK)/$(MYSQL_NAME)
+SOURCE := $(BUILD_PATH)/$(BENCHMARK)/$(MYSQL_NAME)
 
 OPENSSL_NAME := openssl-3.0.5
 OPENSSL_PACKAGE_NAME := $(OPENSSL_NAME).tar.gz
@@ -36,8 +36,8 @@ define build_mysql
 	mkdir -p $(INSTALL_DIR)
 	rm -f $(PWD)/$(1).count-push-pop 
 	touch $(PWD)/$(1).count-push-pop
-	cd $(BUILD_DIR)/$(1) && cmake -G Ninja $(MYSQL_SOURCE) \
-		-DWITH_BOOST=$(MYSQL_SOURCE)/boost/boost_1_77_0 \
+	cd $(BUILD_DIR)/$(1) && cmake -G Ninja $(SOURCE) \
+		-DWITH_BOOST=$(SOURCE)/boost/boost_1_77_0 \
 		-DCMAKE_INSTALL_PREFIX=$(INSTALL_DIR) \
 		-DCMAKE_LINKER="lld" \
 		-DCMAKE_BUILD_TYPE=Release \
@@ -67,7 +67,6 @@ define build_mysql
 	
 	$(call mv_binary,$(1))
 	$(call switch_binary,$(1))
-	touch $@
 endef
 
 
@@ -89,6 +88,7 @@ define gen_perfdata
 $(1)$(2).perfdata: $(1) 
 	$(call switch_binary,$(1),$(2))
 	$(call copy_to_server,$(1),$(2))
+	cd $(BUILD_PATH)/$(BENCHMARK) && \
 	$(RUN) ./loadtest-funcs.sh run_perf -o "$$@" -- \
 			./loadtest-funcs.sh run_sysbench_loadtest "$(1)$(2)" \
 		|| { echo "*** loadtest failed ***" ; rm -f $$@ ; exit 1; }
@@ -102,6 +102,7 @@ define gen_bench
 $(1)$(2).bench: $(1)
 	$(call switch_binary,$(1),$(2))
 	$(call copy_to_server,$(1),$(2))
+	cd $(BUILD_PATH)/$(BENCHMARK) && \
 	$(RUN) ./loadtest-funcs.sh run_sysbench_benchmark $(1)$(2) 5 
 	$(RUN_FOR_REMOTE) mkdir -p $(BENCH_DIR)/
 	$(COPY_BACK) $(BENCH_DIR)/$(1)$(2)
@@ -119,14 +120,16 @@ $(eval $(call gen_pgo_targets,full))
 debug-makefile:
 	$(warning $(call gen_pgo_targets,full))
 
-instrumented: $(MYSQL_SOURCE)/README
+instrumented: | $(SOURCE)/.complete
 	$(call build_mysql,$@,$(call gen_build_flags_ins) -DFPROFILE_GENERATE=1 -DFPROFILE_DIR="$(INSTRUMENTED_PROF)/%4m.profraw",install)
+	touch $@
 
 instrumented.profdata: instrumented
 	rm -rf $(INSTRUMENTED_PROF)
 	$(call switch_binary,instrumented)
-	bash "$(mkfile_path)loadtest-funcs.sh" setup_mysql instrumented 2>&1 
-	bash "$(mkfile_path)loadtest-funcs.sh" run_sysbench_loadtest instrumented
+	cd $(BUILD_PATH)/$(BENCHMARK) && \
+		bash "$(mkfile_path)loadtest-funcs.sh" setup_mysql instrumented 2>&1  && \
+		bash "$(mkfile_path)loadtest-funcs.sh" run_sysbench_loadtest instrumented
 	cd $(INSTRUMENTED_PROF) ; \
 	$(LLVM_BIN)/llvm-profdata merge -output=$@ *.profraw ; \
 	rm *.profraw
@@ -134,10 +137,10 @@ instrumented.profdata: instrumented
 $(MYSQL_PACKAGE_NAME):
 	wget -q https://dev.mysql.com/get/Downloads/MySQL-8.0/$(MYSQL_PACKAGE_NAME)
 
-$(MYSQL_SOURCE)/README: $(MYSQL_PACKAGE_NAME) $(OPENSSL_SOURCE)/install $(NCURSE_SOURCE)/install $(mkfile_path)/packages/mysql.patch
+$(SOURCE)/.complete: $(MYSQL_PACKAGE_NAME) $(OPENSSL_SOURCE)/install $(NCURSE_SOURCE)/install $(mkfile_path)/packages/mysql.patch
 	mkdir -p $(BUILD_PATH)/$(BENCHMARK)/
 	cd $(BUILD_PATH)/$(BENCHMARK)/ && tar xzf $(PWD)/$<
-	cd "$(MYSQL_SOURCE)" ; patch -p1 < "$(lastword $^)"
+	cd "$(SOURCE)" ; patch -p1 < "$(lastword $^)"
 	touch $@
 
 $(OPENSSL_PACKAGE_NAME):
@@ -148,7 +151,7 @@ $(OPENSSL_SOURCE)/README: $(OPENSSL_PACKAGE_NAME)
 	cd $(BUILD_PATH)/$(BENCHMARK)/ && tar xzf $(PWD)/$<
 	touch $@
 
-$(OPENSSL_SOURCE)/install: $(OPENSSL_SOURCE)/README
+$(OPENSSL_SOURCE)/install: | $(OPENSSL_SOURCE)/README
 	cd $(OPENSSL_SOURCE) && CC=$(NCC) CXX=$(NCXX) ./config no-shared --prefix=$(OPENSSL_SOURCE)/install \
 	 && make depend -j$(shell nproc) && make -j$(shell nproc)
 	cd $(OPENSSL_SOURCE) && make install_sw
@@ -162,7 +165,7 @@ $(NCURSE_SOURCE)/README: $(NCURSE_PACKAGE_NAME)
 	cd $(BUILD_PATH)/$(BENCHMARK)/ && tar xzf $(PWD)/$<
 	touch $@
 
-$(NCURSE_SOURCE)/install: $(NCURSE_SOURCE)/README
+$(NCURSE_SOURCE)/install: | $(NCURSE_SOURCE)/README
 	cd $(NCURSE_SOURCE) && CC=$(NCC) CXX=$(NCXX) ./configure --prefix=$(NCURSE_SOURCE)/install
 	cd $(NCURSE_SOURCE) && make -j$(shell nproc) && make install
 	cp $(mkfile_path)/packages/CursesConfig.cmake $(NCURSE_SOURCE)/install
