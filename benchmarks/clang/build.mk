@@ -43,9 +43,15 @@ define build_clang
 		CLANG_PROXY_ARGS="$(4)" CLANG_PROXY_VAR="$(5)" \
 		time -o $(PWD)/$(1)/time.log ninja $(3) -j $(shell nproc) -v > $(PWD)/$(1)/build.log \
 		|| { echo "*** build failed ***"; exit 1 ; }
+	if [ ! -d "$(PWD)/install.dir" ]; then \
+		mkdir -p $(INSTALL_DIR) && ninja install -v >> $(PWD)/$(1)/build.log; \
+		if [ "$(1)" != "instrumented" ]; then \
+			mv $(INSTALL_DIR) $(PWD)/install.dir; \
+		fi; \
+	fi
 	if [ ! -d "$(INSTALL_DIR)/bin" ]; then \
-		cd $(BUILD_DIR)/$(1) && ninja install -j $(shell nproc) -v >>  $(PWD)/$(1)/build.log; \
-	fi 
+		mkdir -p $(BUILD_PATH)/$(BENCHMARK) && cp -sr $(PWD)/install.dir $(BUILD_PATH)/$(BENCHMARK)/; fi
+
 	echo "---------$(1)---------" >> ../clang.raw
 	cat $(PWD)/$(1).count-push-pop >> ../clang.raw 
 	echo "---------$(1)---------" >> ../clang.output
@@ -142,5 +148,3 @@ $(SOURCE)/.complete: $(CLANG_VERSION).zip
 	mkdir -p $(BUILD_PATH)/$(BENCHMARK)
 	cd $(BUILD_PATH)/$(BENCHMARK) && unzip -q -o $(PWD)/$<
 	touch $@
-
-	
