@@ -12,6 +12,8 @@ BUILD_ACTION=build_clang
 BUILD_TARGET=clang lld
 
 define switch_binary
+	if [ ! -d "$(INSTALL_DIR)/bin" ]; then \
+		mkdir -p $(BUILD_PATH)/$(BENCHMARK) && cp -sr $(PWD)/install.dir $(BUILD_PATH)/$(BENCHMARK)/; fi
 	rm -f $(INSTALL_DIR)/$(MAIN_BIN)
 	rm -f $(INSTALL_DIR)/bin/lld
 	ln -s $(PWD)/$(1)/$(MAIN_BIN)$(2) $(INSTALL_DIR)/$(MAIN_BIN)
@@ -44,14 +46,11 @@ define build_clang
 		time -o $(PWD)/$(1)/time.log ninja $(3) -j $(shell nproc) -v > $(PWD)/$(1)/build.log \
 		|| { echo "*** build failed ***"; exit 1 ; }
 	if [ ! -d "$(PWD)/install.dir" ]; then \
-		mkdir -p $(INSTALL_DIR) && ninja install -v >> $(PWD)/$(1)/build.log; \
+		mkdir -p $(INSTALL_DIR) && cd $(BUILD_DIR)/$(1) && ninja install -v >> $(PWD)/$(1)/build.log; \
 		if [ "$(1)" != "instrumented" ]; then \
 			mv $(INSTALL_DIR) $(PWD)/install.dir; \
 		fi; \
 	fi
-	if [ ! -d "$(INSTALL_DIR)/bin" ]; then \
-		mkdir -p $(BUILD_PATH)/$(BENCHMARK) && cp -sr $(PWD)/install.dir $(BUILD_PATH)/$(BENCHMARK)/; fi
-
 	echo "---------$(1)---------" >> ../clang.raw
 	cat $(PWD)/$(1).count-push-pop >> ../clang.raw 
 	echo "---------$(1)---------" >> ../clang.output
@@ -83,7 +82,8 @@ endef
 
 
 define copy_to_server
-	cd $(BENCH_DIR) && $(RUN_FOR_REMOTE) sed 's/\/[^ ]*IPRA-exp/\/tmp\/IPRA-exp/g; s/^:.*://g;' ./perf_commands.sh > ./perf_commands-copy.sh && \
+	mkdir -p $(BENCH_DIR) && cd $(BENCH_DIR) \
+	   && $(RUN_FOR_REMOTE) sed 's/\/[^ ]*IPRA-exp/\/tmp\/IPRA-exp/g; s/^:.*://g;' ./perf_commands.sh > ./perf_commands-copy.sh && \
 				sed ' s/\.cpp\.o -c/\.cpp\.i -E/g; s/^:.*://g;' ./perf_commands.sh > ./preprocess.sh &&  \
 				 $(RUN_FOR_REMOTE) $(INSTALL_PATH)/process_cmd < ./perf_commands-copy.sh > ./perf_commands_remote.sh && \
 				 $(RUN_FOR_REMOTE) bash ./preprocess.sh
@@ -100,8 +100,10 @@ define gen_perfdata
 
 $(1)$(2).perfdata: $(1) 
 	$(call switch_binary,$(1),$(2))
+	$(call clang_bench,$(INSTALL_DIR)/bin)
 	$(call copy_to_server,$(1),$(2))
-	cd $(BENCH_DIR) && $(PERF) record -e cycles:u -j any,u -o ../$$@ -- $(TASKSET) bash ./perf_commands.sh
+	mkdir -p $(BENCH_DIR) && cd $(BENCH_DIR) && \
+		$(PERF) record -e cycles:u -j any,u -o ../$$@ -- $(TASKSET) bash ./perf_commands.sh
 	$(COPY_BACK) $(PWD)/$$@
 	$(RUN_ON_REMOTE) rm -rf $(BENCH_DIR)
 
@@ -111,8 +113,10 @@ define gen_bench
 
 $(1)$(2).bench: $(1)
 	$(call switch_binary,$(1),$(2))
+	$(call clang_bench,$(INSTALL_DIR)/bin)
 	$(call copy_to_server,$(1),$(2))
-	cd $(BENCH_DIR) && $(PERF) stat $(PERF_EVENTS) -o ../$$@ -r5 -- $(TASKSET) bash ./perf_commands.sh
+	mkdir -p $(BENCH_DIR) && cd $(BENCH_DIR) && \
+		$(PERF) stat $(PERF_EVENTS) -o ../$$@ -r5 -- $(TASKSET) bash ./perf_commands.sh
 	$(COPY_BACK) $(PWD)/$$@
 	$(RUN_ON_REMOTE) rm -rf $(BENCH_DIR)
 
@@ -137,7 +141,7 @@ instrumented.profdata: instrumented
 	$(call switch_binary,instrumented)
 	$(call clang_bench,$(INSTALL_DIR)/bin)
 	cd $(BENCH_DIR) && ./perf_commands.sh
-	cd $(INSTRUMENTED_PROF) && $(LLVM_BIN)/llvm-profdata merge -output=$(PWD)/instrumented.profdata *
+	cd $(INSTRUMENTED_PROF) && $(LLVM_BIN)/llvm-profdata merge -output=$(PWD)/instrumented.profdata * && rm *.profraw
 	rm -rf $(INSTALL_DIR)
 
 

@@ -20,6 +20,7 @@ COUNTSUM:= $(PWD)/install/count-sum
 FDO:= $(PWD)/install/FDO
 CREATE_REG:= $(PWD)/install/autofdo/create_reg_prof
 
+
 HPCC_HOST:=cluster.hpcc.ucr.edu
 HPCC_USER:=xsun042
 
@@ -57,6 +58,9 @@ build: check-tools  install/llvm install/autofdo install/counter install/clang_p
 OUTPUT_PATH = $(PWD)/build
 BUILD_PATH = $(PWD)/tmp
 INSTALL_PATH = $(PWD)/install
+
+DRRUN:=$(INSTALL_PATH)/DynamoRIO-Linux-9.0.19328/bin64/drrun -c $(INSTALL_PATH)/../build/ppcount/libppcount.so -- 
+
 
 define tool-available
 	$(eval $(1) := $(shell which $(2)))
@@ -189,6 +193,7 @@ upload-image:
 upload-bench:
 	scp -pr ./benchmarks $(HPCC_USER)@$(HPCC_HOST):/rhome/xsun042/bigdata/IPRA-exp
 	scp Makefile $(HPCC_USER)@$(HPCC_HOST):/rhome/xsun042/bigdata/IPRA-exp/
+	scp make.sh $(HPCC_USER)@$(HPCC_HOST):/rhome/xsun042/bigdata/IPRA-exp/
 
 hpcc: upload-bench
 	ssh $(HPCC_USER)@$(HPCC_HOST) "cd /rhome/xsun042/bigdata/IPRA-exp && \
@@ -200,6 +205,28 @@ copy-google-lib:
 	cp $(GOOGLE_WORKSPACE)/google3/blaze-bin/third_party/llvm/llvm-project/{clang/clang,lld/lld} install/llvm/bin
 	cp -Lr $(GOOGLE_LIB_GCC) install/llvm/lib/gcc
 	cp -Lr $(GOOGLE_LIB) install/llvm/lib
+
+
+test/autofdo: 
+	mkdir -p build
+	cmake -G Ninja -B $(BUILD_PATH)/autofdo2 -S build/autofdo \
+		-DCMAKE_BUILD_TYPE=${AUTOFDO_BUILD_TYPE} \
+		-DLLVM_PATH=$(INSTALL_PATH)/llvm \
+		-DCMAKE_INSTALL_PREFIX=$(INSTALL_PATH)/autofdo2 
+	cd $(BUILD_PATH)/autofdo2 && ninja 
+
+
+install/DynamoRIO:
+	cd install && wget https://github.com/DynamoRIO/dynamorio/releases/download/cronbuild-9.0.19328/DynamoRIO-Linux-9.0.19328.tar.gz
+	cd install && tar -xzf DynamoRIO-Linux-9.0.19328.tar.gz
+
+install/ppcount:
+	mkdir -p build/ppcount
+	cd build/ppcount && cmake -DDynamoRIO_DIR=$(INSTALL_PATH)/DynamoRIO-Linux-9.0.19328/cmake -G Ninja ../../push-pop-counter
+	cd build/ppcount && ninja
+
+
+
 
 include benchmarks/build.mk
 include example/build.mk

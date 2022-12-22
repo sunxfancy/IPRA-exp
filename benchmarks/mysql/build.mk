@@ -26,8 +26,10 @@ BUILD_ACTION=build_mysql
 BUILD_TARGET=mysqld
 
 define switch_binary
+	if [ ! -d "$(INSTALL_DIR)/bin" ]; then \
+		mkdir -p $(BUILD_PATH)/$(BENCHMARK) && cp -sr $(PWD)/install.dir $(BUILD_PATH)/$(BENCHMARK)/; fi
 	rm -f $(INSTALL_DIR)/$(MAIN_BIN)
-	ln -s $(PWD)/$(1)/$(MAIN_BIN)$(2) $(INSTALL_DIR)/$(MAIN_BIN)
+	cp $(PWD)/$(1)/$(MAIN_BIN)$(2) $(INSTALL_DIR)/$(MAIN_BIN)
 endef
 
 define build_mysql
@@ -58,13 +60,11 @@ define build_mysql
 		time -o $(PWD)/$(1)/time.log ninja $(3) -j $(shell nproc) -v > $(PWD)/$(1)/build.log \
 		|| { echo "*** build failed ***"; exit 1 ; }
 	if [ ! -d "$(PWD)/install.dir" ]; then \
-		mkdir -p $(INSTALL_DIR) && ninja install -v >> $(PWD)/$(1)/build.log; \
+		mkdir -p $(INSTALL_DIR) && cd $(BUILD_DIR)/$(1) && ninja install -v >> $(PWD)/$(1)/build.log; \
 		if [ "$(1)" != "instrumented" ]; then \
 			mv $(INSTALL_DIR) $(PWD)/install.dir; \
 		fi; \
 	fi
-	if [ ! -d "$(INSTALL_DIR)/bin" ]; then \
-		mkdir -p $(BUILD_PATH)/$(BENCHMARK) && cp -sr $(PWD)/install.dir $(BUILD_PATH)/$(BENCHMARK)/; fi
 	echo "---------$(1)---------" >> ../mysql.raw
 	cat $(PWD)/$(1).count-push-pop >> ../mysql.raw 
 	echo "---------$(1)---------" >> ../mysql.output
@@ -94,9 +94,9 @@ $(1)$(2).perfdata: $(1)
 	$(call switch_binary,$(1),$(2))
 	$(call copy_to_server,$(1),$(2))
 	cd $(BUILD_PATH)/$(BENCHMARK) && \
-	$(RUN) ./loadtest-funcs.sh run_perf -o "$$@" -- \
-			./loadtest-funcs.sh run_sysbench_loadtest "$(1)$(2)" \
-		|| { echo "*** loadtest failed ***" ; rm -f $$@ ; exit 1; }
+		bash "$(mkfile_path)loadtest-funcs.sh" run_perf -o "$(PWD)/$$@" -- \
+		bash "$(mkfile_path)loadtest-funcs.sh" run_sysbench_loadtest "$(1)$(2)" \
+		|| { echo "*** loadtest failed ***" ; rm -f $(PWD)/$$@ ; exit 1; }
 	$(COPY_BACK) $(PWD)/$$@
 	$(RUN_ON_REMOTE) rm -rf $(PWD)/
 
@@ -117,7 +117,7 @@ endef
 
 additional_compiler_flags = $(if $(findstring thin,$(1)),-flto=thin)  $(if $(findstring full,$(1)),-flto=full) 
 additional_linker_flags = $(if $(findstring thin,$(1)),-flto=thin)  $(if $(findstring full,$(1)),-flto=full) 
-additional_original_flags = -DFPROFILE_USE=1 -DFPROFILE_DIR="$(INSTRUMENTED_PROF)/default.profdata"
+additional_original_flags = -DFPROFILE_USE=1 -DFPROFILE_DIR="$(PWD)/instrumented.profdata"
 
 $(eval $(call gen_pgo_targets,thin))
 $(eval $(call gen_pgo_targets,full))
@@ -136,8 +136,9 @@ instrumented.profdata: instrumented
 		bash "$(mkfile_path)loadtest-funcs.sh" setup_mysql instrumented 2>&1  && \
 		bash "$(mkfile_path)loadtest-funcs.sh" run_sysbench_loadtest instrumented
 	cd $(INSTRUMENTED_PROF) ; \
-	$(LLVM_BIN)/llvm-profdata merge -output=$@ *.profraw ; \
+	$(LLVM_BIN)/llvm-profdata merge -output=$(PWD)/instrumented.profdata *.profraw ; \
 	rm *.profraw
+	rm -rf $(INSTALL_DIR)
 
 $(MYSQL_PACKAGE_NAME):
 	wget -q https://dev.mysql.com/get/Downloads/MySQL-8.0/$(MYSQL_PACKAGE_NAME)
