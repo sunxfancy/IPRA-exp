@@ -130,7 +130,7 @@ $(BUILD_PATH)/llvm/build.ninja: LLVM-IPRA
 		-DLLVM_BUILD_TESTS=ON \
 		-DLLVM_OPTIMIZED_TABLEGEN=ON \
 		-DLLVM_TARGETS_TO_BUILD="X86" \
-		-DLLVM_ENABLE_RTTI=OFF \
+		-DLLVM_ENABLE_RTTI=ON \
 		-DLLVM_ENABLE_PROJECTS="clang;lld;llvm;compiler-rt;bolt" \
 		-DCMAKE_INSTALL_PREFIX=$(INSTALL_PATH)/llvm \
 		-DLLVM_CCACHE_BUILD=OFF \
@@ -226,7 +226,8 @@ install/ppcount:
 	cd build/ppcount && ninja
 
 
-
+deepclean:
+	rm -rf build/ install/ tmp/
 
 include benchmarks/build.mk
 include example/build.mk

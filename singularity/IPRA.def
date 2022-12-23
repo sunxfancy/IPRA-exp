@@ -5,7 +5,7 @@ From: ubuntu:20.04
     apt-get -y update
     DEBIAN_FRONTEND=noninteractive TZ=Etc/UTC apt-get -y install tzdata
     apt-get -y install linux-tools-generic
-    apt-get -y install build-essential cmake bazel ninja-build golang sysbench flex bison
+    apt-get -y install build-essential cmake ninja-build golang sysbench flex bison
     apt-get -y install wget unzip python3 time libc++-dev software-properties-common
     apt-get -y install libunwind-dev libgflags-dev libssl-dev libelf-dev libprotobuf-dev protobuf-compiler
     ln -s bash /bin/sh.bash
@@ -13,8 +13,12 @@ From: ubuntu:20.04
     wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key| apt-key add -
     apt-add-repository 'deb http://apt.llvm.org/focal/ llvm-toolchain-focal-15 main'
     add-apt-repository ppa:ubuntu-toolchain-r/test
+    apt-get install apt-transport-https curl gnupg -y
+    curl -fsSL https://bazel.build/bazel-release.pub.gpg | gpg --dearmor >bazel-archive-keyring.gpg
+    mv bazel-archive-keyring.gpg /usr/share/keyrings
+    echo "deb [arch=amd64 signed-by=/usr/share/keyrings/bazel-archive-keyring.gpg] https://storage.googleapis.com/bazel-apt stable jdk1.8" | tee /etc/apt/sources.list.d/bazel.list
     apt-get -y update 
-    apt-get -y install clang-15
+    apt-get -y install clang-15 bazel
     echo "kernel.perf_event_paranoid = -1" > /etc/sysctl.conf
 
 %environment
