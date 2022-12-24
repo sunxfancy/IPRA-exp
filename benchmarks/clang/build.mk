@@ -72,13 +72,14 @@ define clang_bench
 			-DLLVM_OPTIMIZED_TABLEGEN=On \
 			-DCMAKE_C_COMPILER=$(1)/clang \
 			-DCMAKE_CXX_COMPILER=$(1)/clang++ \
-			-DCMAKE_C_FLAGS="-I$(INSTALL_DIR)/lib/clang/15.0.3/include" \
-			-DCMAKE_CXX_FLAGS="-I$(INSTALL_DIR)/lib/clang/15.0.3/include" \
 			-DLLVM_ENABLE_PROJECTS="clang" \
 		&& (ninja -t commands | head -100 > $(BENCH_DIR)/perf_commands.sh) \
 		&& chmod +x ./perf_commands.sh; \
 	fi
 endef
+
+# -DCMAKE_C_FLAGS="-I$(INSTALL_DIR)/lib/clang/15.0.3/include" \
+# -DCMAKE_CXX_FLAGS="-I$(INSTALL_DIR)/lib/clang/15.0.3/include" \
 
 
 define copy_to_server
