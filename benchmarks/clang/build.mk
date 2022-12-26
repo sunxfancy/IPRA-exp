@@ -1,6 +1,35 @@
-mkfile_path := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
+ifeq (0,1) # The following is the editable source code
+
+source: 
+	cd $(TMP)/source
+	wget -q https://github.com/llvm/llvm-project/archive/refs/tags/<FO:$(CLANG_VERSION).zip>
+	
+$(TMP)/source_dir: source
+	cd $(TMP)/source_dir_tmp
+	unzip -q -o $(PWD)/$</$(CLANG_VERSION).zip
+
+build/instrumented: | $(TMP)/source_dir
+	$(call build_clang,$@,-DLLVM_BUILD_INSTRUMENTED=ON $(call gen_build_flags_ins),install)
+
+prof/instrumented: instrumented
+	$(call switch_binary,instrumented)
+	$(call clang_bench,$(INSTALL_DIR)/bin)
+	cd $(BENCH_DIR) && ./perf_commands.sh
+	cd $(INSTRUMENTED_PROF) && $(LLVM_BIN)/llvm-profdata merge -output=$(PWD)/instrumented.profdata * && rm *.profraw
+	rm -rf $(INSTALL_DIR)
+
+
+endif # End of the editable source code
+
+#-------------------- Editable Library Code --------------------#
+
+
+MAKEFILE_PATH := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
 BENCHMARK=clang
-include $(mkfile_path)../common.mk
+
+additional_original_flags =  $(if $(findstring thin,$(1)),-DLLVM_ENABLE_LTO=Thin) \
+														 $(if $(findstring full,$(1)),-DLLVM_ENABLE_LTO=Full) \
+														 -DLLVM_PROFDATA_FILE=$(PWD)/instrumented.profdata
 
 CLANG_VERSION=llvmorg-15.0.3
 SOURCE = $(BUILD_PATH)/$(BENCHMARK)/llvm-project-$(CLANG_VERSION)/llvm
@@ -97,63 +126,84 @@ define copy_to_server
 endef
 
 
-define gen_perfdata
+include $(MAKEFILE_PATH)../common.mk
 
-$(1)$(2).perfdata: $(1) 
-	$(call switch_binary,$(1),$(2))
-	$(call clang_bench,$(INSTALL_DIR)/bin)
-	$(call copy_to_server,$(1),$(2))
-	mkdir -p $(BENCH_DIR) && cd $(BENCH_DIR) && \
-		$(PERF) record -e cycles:u -j any,u -o ../$$@ -- $(TASKSET) bash ./perf_commands.sh
-	$(COPY_BACK) $(PWD)/$$@
-	$(RUN_ON_REMOTE) rm -rf $(BENCH_DIR)
-	rm -rf $$@ 
-	mv $(BUILD_PATH)/clang/$$@ $$@
 
-endef
+ifeq (,)
 
-define gen_bench
+#-------------------- DO NOT EDIT BELOW THIS LINE --------------------#
 
-$(1)$(2).bench: $(1)
-	$(call switch_binary,$(1),$(2))
-	$(call clang_bench,$(INSTALL_DIR)/bin)
-	$(call copy_to_server,$(1),$(2))
-	mkdir -p $(BENCH_DIR) && cd $(BENCH_DIR) && \
-		$(PERF) stat $(PERF_EVENTS) -o ../$$@ -r5 -- $(TASKSET) bash ./perf_commands.sh
-	$(COPY_BACK) $(PWD)/$$@
-	$(RUN_ON_REMOTE) rm -rf $(BENCH_DIR)
-	rm -rf $$@
-	mv $(BUILD_PATH)/clang/$$@ $$@
+ifeq ($(DEBUG),1)
+source:
+	$(DEFAULT_PREACTION)
+	mkdir -p $(TMP)/source
+	cd $(TMP)/source
+	$(call make_sure_parent_dir_exist,$(CLANG_VERSION).zip)
+	touch $(CLANG_VERSION).zip
+	$(call check_file_exist,$(CLANG_VERSION).zip)
+	cd $(PWD)
+	$(DEFAULT_ACTION)
 
-endef 
 
-additional_original_flags =  $(if $(findstring thin,$(1)),-DLLVM_ENABLE_LTO=Thin) \
-														 $(if $(findstring full,$(1)),-DLLVM_ENABLE_LTO=Full) \
-														 -DLLVM_PROFDATA_FILE=$(PWD)/instrumented.profdata
+$(TMP)/source_dir: source
+	$(DEFAULT_PREACTION)
+	mkdir -p $(TMP)/source_dir_tmp
+	cd $(TMP)/source_dir_tmp
+	cd $(PWD)
+	$(DEFAULT_ACTION)
 
-$(eval $(call gen_pgo_targets,thin))
-$(eval $(call gen_pgo_targets,full))
 
-debug-makefile:
-	$(warning $(call gen_pgo_targets,full))
+build/instrumented:
+	$(DEFAULT_PREACTION)
+	cd $(PWD)
+	$(DEFAULT_ACTION)
 
-instrumented: | $(SOURCE)/.complete
+
+prof/instrumented: instrumented
+	$(DEFAULT_PREACTION)
+	cd $(PWD)
+	$(DEFAULT_ACTION)
+
+
+else
+source:
+	$(DEFAULT_PREACTION)
+	mkdir -p $(TMP)/source
+	cd $(TMP)/source
+	$(call make_sure_parent_dir_exist,$(CLANG_VERSION).zip)
+	wget -q https://github.com/llvm/llvm-project/archive/refs/tags/$(CLANG_VERSION).zip
+	$(call check_file_exist,$(CLANG_VERSION).zip)
+	cd $(PWD)
+	$(DEFAULT_ACTION)
+
+
+$(TMP)/source_dir: source
+	$(DEFAULT_PREACTION)
+	mkdir -p $(TMP)/source_dir_tmp
+	cd $(TMP)/source_dir_tmp
+	unzip -q -o $(PWD)/$</$(CLANG_VERSION).zip
+	cd $(PWD)
+	$(DEFAULT_ACTION)
+
+
+build/instrumented:
+	$(DEFAULT_PREACTION)
 	$(call build_clang,$@,-DLLVM_BUILD_INSTRUMENTED=ON $(call gen_build_flags_ins),install)
-	touch $@
+	cd $(PWD)
+	$(DEFAULT_ACTION)
 
-instrumented.profdata: instrumented
-	rm -rf $(INSTRUMENTED_PROF)
+
+prof/instrumented: instrumented
+	$(DEFAULT_PREACTION)
 	$(call switch_binary,instrumented)
 	$(call clang_bench,$(INSTALL_DIR)/bin)
 	cd $(BENCH_DIR) && ./perf_commands.sh
 	cd $(INSTRUMENTED_PROF) && $(LLVM_BIN)/llvm-profdata merge -output=$(PWD)/instrumented.profdata * && rm *.profraw
 	rm -rf $(INSTALL_DIR)
+	cd $(PWD)
+	$(DEFAULT_ACTION)
 
 
-$(CLANG_VERSION).zip: 
-	wget -q https://github.com/llvm/llvm-project/archive/refs/tags/$(CLANG_VERSION).zip
+endif
 
-$(SOURCE)/.complete: $(CLANG_VERSION).zip
-	mkdir -p $(BUILD_PATH)/$(BENCHMARK)
-	cd $(BUILD_PATH)/$(BENCHMARK) && unzip -q -o $(PWD)/$<
-	touch $@
+endif

@@ -15,3 +15,6 @@
 /tmp/
 compile_commands.json
 *.sif
+
+/build2/
+/tmp2/

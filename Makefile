@@ -29,7 +29,8 @@ TASKSET:=
 # TASKSET:=$(TASKSET)
 
 REMOTE_PERF:=false
-PERF_PATH:=/usr/lib/linux-tools/5.15.0-56-generic/perf
+PERF_PATH:=perf
+# PERF_PATH:=/usr/lib/linux-tools/5.15.0-56-generic/perf
 # PERF_PATH:=/usr/lib/linux-hwe-tools-4.18.0-21/perf
 ifeq ($(REMOTE_PERF), true)
 	COPY_TO_REMOTE:=bash $(PWD)/scripts/copy-to-test-machine.sh
@@ -54,10 +55,8 @@ MOLD:=
 .PHONY: build check-tools install/llvm install/autofdo install/counter install/clang_proxy install/count-sum
 build: check-tools  install/llvm install/autofdo install/counter install/clang_proxy install/count-sum
 
-# BUILD_PATH = /tmp/IPRA-exp
-# BUILD_PATH = /scratch
-OUTPUT_PATH = $(PWD)/build
-BUILD_PATH = $(PWD)/tmp
+BUILD_PATH = $(PWD)/build2
+TMP_PATH = $(PWD)/tmp2
 INSTALL_PATH = $(PWD)/install
 
 DRRUN:=$(INSTALL_PATH)/DynamoRIO-Linux-9.0.19328/bin64/drrun -c $(INSTALL_PATH)/../build/ppcount/libppcount.so -- 
@@ -236,9 +235,15 @@ install/ppcount:
 	cd build/ppcount && cmake -DDynamoRIO_DIR=$(INSTALL_PATH)/DynamoRIO-Linux-9.0.19328/cmake -G Ninja ../../push-pop-counter
 	cd build/ppcount && ninja
 
+gen:
+	$(UMAKE) benchmarks/common.mk
+	$(UMAKE) benchmarks/clang/build.mk
+
+clean:
+	rm -rf $(BUILD_PATH) $(TMP_PATH)
 
 deepclean:
-	rm -rf build/ install/ tmp/
+	rm -rf $(BUILD_PATH) $(TMP_PATH) $(INSTALL_PATH) 
 
 include benchmarks/build.mk
 include example/build.mk

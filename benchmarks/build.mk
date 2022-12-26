@@ -49,12 +49,19 @@ SUBDIRS := $(patsubst %/build.mk,%,$(wildcard benchmarks/*/build.mk))
 
 .PHONY: $(SUBDIRS)
 
-$(SUBDIRS):
-	mkdir -p $(OUTPUT_PATH)/$@
-	$(MAKE) -C $(OUTPUT_PATH)/$@ -f $(PWD)/$@/build.mk 
+$(SUBDIRS): | gen
+	@mkdir -p $(BUILD_PATH)/$@
+	@$(MAKE) -C $(BUILD_PATH)/$@ -f $(PWD)/$@/build.mk 
 
-benchmarks/%: 
-	mkdir -p $(OUTPUT_PATH)/$(dir $@)
-	$(MAKE) -C $(OUTPUT_PATH)/$(dir $@) -f $(PWD)/$(dir $@)build.mk $(notdir $@) 
+define make_bench
+$(BENCH)/%: | gen
+	@mkdir -p $(BUILD_PATH)/$(BENCH)
+	@$(MAKE) -C $(BUILD_PATH)/$(BENCH) -f $(PWD)/$(BENCH)/build.mk $$*
+
+endef
+
+$(warning $(SUBDIRS))
+$(foreach BENCH,$(SUBDIRS),$(eval $(call make_bench)))
+
 
 
