@@ -107,6 +107,8 @@ $(1)$(2).perfdata: $(1)
 		$(PERF) record -e cycles:u -j any,u -o ../$$@ -- $(TASKSET) bash ./perf_commands.sh
 	$(COPY_BACK) $(PWD)/$$@
 	$(RUN_ON_REMOTE) rm -rf $(BENCH_DIR)
+	rm -rf $$@ 
+	mv $(BUILD_PATH)/clang/$$@ $$@
 
 endef
 
@@ -120,6 +122,8 @@ $(1)$(2).bench: $(1)
 		$(PERF) stat $(PERF_EVENTS) -o ../$$@ -r5 -- $(TASKSET) bash ./perf_commands.sh
 	$(COPY_BACK) $(PWD)/$$@
 	$(RUN_ON_REMOTE) rm -rf $(BENCH_DIR)
+	rm -rf $$@
+	mv $(BUILD_PATH)/clang/$$@ $$@
 
 endef 
 
