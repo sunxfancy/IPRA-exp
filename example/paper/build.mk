@@ -50,5 +50,5 @@ all:
 	$(call get_count,no_ipra_both.S)
 
 # nm fdo_ipra
-# $(DRRUN) fdo_ipra
-# $(DRRUN) no_ipra
+	$(DRRUN) fdo_ipra
+	$(DRRUN) no_ipra

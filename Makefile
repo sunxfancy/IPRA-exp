@@ -59,7 +59,7 @@ OUTPUT_PATH = $(PWD)/build
 BUILD_PATH = $(PWD)/tmp
 INSTALL_PATH = $(PWD)/install
 
-DRRUN:=$(INSTALL_PATH)/DynamoRIO-Linux-9.0.19328/bin64/drrun -c $(INSTALL_PATH)/../build/ppcount/libppcount.so -- 
+DRRUN:=$(INSTALL_PATH)/DynamoRIO-Linux-9.0.19328/bin64/drrun -debug -loglevel 1 -c $(INSTALL_PATH)/../build/ppcount/libppcount.so -- 
 
 
 define tool-available

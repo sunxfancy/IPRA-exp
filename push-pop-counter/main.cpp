@@ -1,4 +1,4 @@
-#include <cstdint>  /* for intptr */
+#include <stdint.h>  /* for intptr */
 #include <stddef.h> /* for offsetof */
 #include "dr_api.h"
 #include "drmgr.h"
