@@ -4,3 +4,6 @@
 [submodule "LLVM-IPRA"]
 	path = LLVM-IPRA
 	url = git@github.com:sunxfancy/LLVM-IPRA.git
+[submodule "UMake"]
+	path = UMake
+	url = git@github.com:sunxfancy/UMake.git

@@ -19,7 +19,8 @@ COUNTER:= $(PWD)/install/counter
 COUNTSUM:= $(PWD)/install/count-sum
 FDO:= $(PWD)/install/FDO
 CREATE_REG:= $(PWD)/install/autofdo/create_reg_prof
-
+REG_PROFILER:= $(PWD)/install/autofdo/reg_profiler
+UMAKE := $(PWD)/install/UMake
 
 HPCC_HOST:=cluster.hpcc.ucr.edu
 HPCC_USER:=xsun042
@@ -138,6 +139,16 @@ $(BUILD_PATH)/llvm/build.ninja: LLVM-IPRA
 
 # -DCMAKE_C_COMPILER=clang \
 # -DCMAKE_CXX_COMPILER=clang++ \
+
+build/UMake: UMake
+	mkdir -p $(BUILD_PATH)/UMake
+	cmake -G Ninja -B $(BUILD_PATH)/UMake -S UMake \
+		-DCMAKE_BUILD_TYPE=Release
+	cmake --build $(BUILD_PATH)/UMake --config Release -j $(shell nproc)
+
+install/UMake: build/UMake
+	mkdir -p $(INSTALL_PATH)
+	cp $(BUILD_PATH)/UMake/UMake $(INSTALL_PATH)/UMake
 
 install/FDO: FDO
 	mkdir -p $(INSTALL_PATH) 
