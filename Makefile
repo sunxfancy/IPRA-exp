@@ -4,7 +4,7 @@ LLVM_BUILD_TYPE=Release
 PWD=$(shell pwd)
 FDO=install/FDO
 
-
+ROOT:=$(PWD)
 LLVM_IPRA = $(PWD)/LLVM-IPRA
 LLVM_BIN = $(PWD)/install/llvm/bin
 
@@ -18,7 +18,7 @@ PERF_EVENTS:= -e instructions,cycles,L1-icache-misses,iTLB-misses,L1-dcache-load
 COUNTER:= $(PWD)/install/counter
 COUNTSUM:= $(PWD)/install/count-sum
 FDO:= $(PWD)/install/FDO
-CREATE_REG:= $(PWD)/install/autofdo/create_reg_prof
+HOT_LIST_CREATOR:= $(PWD)/install/autofdo/hot_list_creator
 REG_PROFILER:= $(PWD)/install/autofdo/reg_profiler
 UMAKE := $(PWD)/install/UMake
 
@@ -39,10 +39,10 @@ ifeq ($(REMOTE_PERF), true)
 	RUN:=bash $(PWD)/scripts/run-on-remote.sh
 	PERF:=$(RUN_ON_REMOTE) $(PERF_PATH)
 else
-	COPY_TO_REMOTE:= echo "skip running - " 
-	RUN_FOR_REMOTE:= echo "skip running - " 
-	COPY_BACK:= echo "skip running - " 
-	RUN_ON_REMOTE:= echo "skip running - " 
+	COPY_TO_REMOTE:= @echo "skip running - COPY_TO_REMOTE " 
+	RUN_FOR_REMOTE:= echo "skip running - RUN_FOR_REMOTE " 
+	COPY_BACK:= @echo "skip running - COPY_BACK " 
+	RUN_ON_REMOTE:= @echo "skip running - RUN_ON_REMOTE " 
 	RUN:=
 	PERF:=$(PERF_PATH)
 endif 
@@ -94,20 +94,16 @@ endef
 #     $(eval $(call lib-available,HAS_elf,libelf-dev))
 #     $(eval $(call lib-available,HAS_protobuf,protobuf-compiler))
 
-
 install/autofdo: build/autofdo
 	$(MOLD) cd $(BUILD_PATH)/autofdo && ninja 
 	cd $(BUILD_PATH)/autofdo && ninja install
+	cd autofdo && $(BUILD_PATH)/autofdo/reg_profiler_test
 	mkdir -p install/autofdo
 # cp $(BUILD_PATH)/autofdo/create_llvm_prof install/autofdo/create_llvm_prof
 	cp $(BUILD_PATH)/autofdo/profile_merger install/autofdo/profile_merger
 	cp $(BUILD_PATH)/autofdo/sample_merger install/autofdo/sample_merger
 	cp $(BUILD_PATH)/autofdo/reg_profiler install/autofdo/reg_profiler
 	cp $(BUILD_PATH)/autofdo/hot_list_creator install/autofdo/hot_list_creator
-
-libgmock:
-	$(MOLD) cmake --build $(BUILD_PATH)/autofdo --config ${AUTOFDO_BUILD_TYPE} -j $(shell nproc) --target lib/libgmock.so.1.10.0
-
 
 build/autofdo: autofdo install/llvm
 	mkdir -p build
@@ -172,8 +168,6 @@ install/clang_proxy: utils/clang_proxy.go $(BUILD_PATH)/llvm/build.ninja
 	mv utils/clang_proxy $(INSTALL_PATH)/llvm/bin/clang_proxy
 	rm -f $(INSTALL_PATH)/llvm/bin/clang_proxy++ 
 	ln -s ./clang_proxy $(INSTALL_PATH)/llvm/bin/clang_proxy++
-
-
 
 install/count-sum: check-tools utils/count-sum.cpp
 	g++ -std=c++17 -O3 utils/count-sum.cpp -o $(INSTALL_PATH)/count-sum

@@ -13,11 +13,11 @@ BUILD_TARGET=clang lld
 
 define switch_binary
 	if [ ! -d "$(INSTALL_DIR)/bin" ]; then \
-		mkdir -p $(BUILD_PATH)/$(BENCHMARK) && cp -sr $(PWD)/install.dir $(BUILD_PATH)/$(BENCHMARK)/; fi
+		mkdir -p $(BUILD_PATH)/$(BENCHMARK) && cp -r $(PWD)/install.dir $(BUILD_PATH)/$(BENCHMARK)/; fi
 	rm -f $(INSTALL_DIR)/$(MAIN_BIN)
 	rm -f $(INSTALL_DIR)/bin/lld
-	ln -s $(PWD)/$(1)/$(MAIN_BIN)$(2) $(INSTALL_DIR)/$(MAIN_BIN)
-	ln -s $(PWD)/$(1)/bin/lld $(INSTALL_DIR)/bin/lld
+	cp $(PWD)/$(1)/$(MAIN_BIN)$(2) $(INSTALL_DIR)/$(MAIN_BIN)
+	cp $(PWD)/$(1)/bin/lld $(INSTALL_DIR)/bin/lld
 endef
 
 define build_clang

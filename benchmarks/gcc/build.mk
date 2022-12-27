@@ -136,7 +136,7 @@ gcc-releases-$(GCC_VERSION):
 	cd gcc-releases-$(GCC_VERSION) && find . -type f -name configure -exec sed -i 's/\$$CC -print-multi-os-directory/gcc -print-multi-os-directory/g' {} \;
 	cd gcc-releases-$(GCC_VERSION) && find . -type f -name configure -exec sed -i 's/\$$CXX -print-multi-os-directory/gcc -print-multi-os-directory/g' {} \;
 	cd gcc-releases-$(GCC_VERSION) && find . -type f -name configure -exec sed -i 's/\$$CC \$$CPPFLAGS \$$CFLAGS \$$LDFLAGS -print-multi-os-directory/gcc -print-multi-os-directory/g' {} \;
-	cd $(MAKEFILE_ROOT) &&  make benchmarks/dparser/dparser-master
+	cd $(ROOT) && $(MAKE) benchmarks/dparser/dparser-master
 
 
 

@@ -96,7 +96,7 @@ endef
 define gen_hot_list
 
 $(1).$(2).hot_list $(1).$(2).detail: $(1).perfdata
-	$(CREATE_REG_PROF) \
+	$(HOT_LIST_CREATOR) \
 		--binary="$(PWD)/$(1)/$(MAIN_BIN)" \
 		--profile="$(PWD)/$(1).perfdata" \
 		--output="$(PWD)/$(1).$(2).hot_list" \
