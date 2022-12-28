@@ -15,6 +15,8 @@ BUILD_ACTION=build_gcc
 BUILD_TARGET=all-gcc
 
 define switch_binary
+	if [ ! -d "$(INSTALL_DIR)/bin" ]; then \
+		mkdir -p $(BUILD_PATH)/$(BENCHMARK) && cp -r $(PWD)/install.dir $(BUILD_PATH)/$(BENCHMARK)/; fi
 	rm -f $(INSTALL_DIR)/libexec/gcc/x86_64-linux-gnu/$(GCC_VERSION)/cc1
 	ln -s $(PWD)/$(1)/$(MAIN_BIN)$(2) $(INSTALL_DIR)/libexec/gcc/x86_64-linux-gnu/$(GCC_VERSION)/cc1
 endef
@@ -83,7 +85,7 @@ endef
 
 
 define copy_to_server
-	cd bench.dir && $(RUN_FOR_REMOTE) sed 's/\/[^ ]*IPRA-exp/\/tmp\/IPRA-exp/g; s/^:.*://g;' ./perf_commands.sh > ./perf_commands-copy.sh && \
+	cd $(BENCH_DIR) && $(RUN_FOR_REMOTE) sed 's/\/[^ ]*IPRA-exp/\/tmp\/IPRA-exp/g; s/^:.*://g;' ./perf_commands.sh > ./perf_commands-copy.sh && \
 				sed ' s/\.cpp\.o -c/\.cpp\.i -E/g; s/^:.*://g;' ./perf_commands.sh > ./preprocess.sh &&  \
 				 $(RUN_FOR_REMOTE) $(INSTALL_PATH)/process_cmd < ./perf_commands-copy.sh > ./perf_commands_remote.sh && \
 				 $(RUN_FOR_REMOTE) bash ./preprocess.sh
@@ -99,9 +101,11 @@ define gen_perfdata
 $(1)$(2).perfdata: $(1) 
 	$(call switch_binary,$(1),$(2))
 	$(call copy_to_server,$(1),$(2))
-	cd bench.dir && $(PERF) record -e cycles:u -j any,u -o ../$$@ -- $(TASKSET) bash ./perf_commands_remote.sh
+	cd $(BENCH_DIR) && $(PERF) record -e cycles:u -j any,u -o ../$$@ -- $(TASKSET) bash ./perf_commands.sh
 	$(COPY_BACK) $(PWD)/$$@
 	$(RUN_ON_REMOTE) rm -rf $(PWD)/bench.dir/
+	rm -rf $$@ 
+	mv $(BUILD_PATH)/$(BENCHMARK)/$$@ $$@
 
 endef
 
@@ -110,10 +114,12 @@ define gen_bench
 $(1)$(2).bench: $(1)
 	$(call switch_binary,$(1),$(2))
 	$(call copy_to_server,$(1),$(2))
-	cd bench.dir && $(PERF) stat $(PERF_EVENTS) -o ../$$@ -r5 -- $(TASKSET) bash ./perf_commands_remote.sh
+	cd $(BENCH_DIR) && $(PERF) stat $(PERF_EVENTS) -o ../$$@ -r5 -- $(TASKSET) bash ./perf_commands.sh
 	$(COPY_BACK) $(PWD)/$$@
 	$(RUN_ON_REMOTE) rm -rf $(PWD)/bench.dir/
-
+	rm -rf $$@ 
+	mv $(BUILD_PATH)/$(BENCHMARK)/$$@ $$@
+	
 endef 
 
 additional_compiler_flags = $(if $(find thin,$(1)),-flto=thin,)  $(if $(find full,$(1)),-flto=full,) -fprofile-use=$(PWD)/instrumented.profdata

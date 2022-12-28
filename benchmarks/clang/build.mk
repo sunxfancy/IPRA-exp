@@ -107,7 +107,7 @@ $(1)$(2).perfdata: $(1)
 	$(COPY_BACK) $(PWD)/$$@
 	$(RUN_ON_REMOTE) rm -rf $(BENCH_DIR)
 	rm -rf $$@ 
-	mv $(BUILD_PATH)/clang/$$@ $$@
+	mv $(BUILD_PATH)/$(BENCHMARK)/$$@ $$@
 
 endef
 
@@ -122,7 +122,7 @@ $(1)$(2).bench: $(1)
 	$(COPY_BACK) $(PWD)/$$@
 	$(RUN_ON_REMOTE) rm -rf $(BENCH_DIR)
 	rm -rf $$@
-	mv $(BUILD_PATH)/clang/$$@ $$@
+	mv $(BUILD_PATH)/$(BENCHMARK)/$$@ $$@
 
 endef 
 
