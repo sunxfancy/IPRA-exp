@@ -58,7 +58,6 @@ define build_clang
 
 	cp $(BUILD_DIR)/$(1)/bin/lld $(PWD)/$(1)/bin/lld
 	$(call mv_binary,$(1))
-	
 	$(call switch_binary,$(1))
 	$(call clang_bench,$(INSTALL_DIR)/bin)
 endef
@@ -73,7 +72,7 @@ define clang_bench
 			-DCMAKE_C_COMPILER=$(1)/clang \
 			-DCMAKE_CXX_COMPILER=$(1)/clang++ \
 			-DLLVM_ENABLE_PROJECTS="clang" \
-		&& (ninja -t commands | head -100 > $(BENCH_DIR)/perf_commands.sh) \
+		&& (ninja -t commands | head -100 > perf_commands.sh) \
 		&& chmod +x ./perf_commands.sh; \
 	fi
 endef
@@ -128,8 +127,8 @@ $(1)$(2).bench: $(1)
 endef 
 
 additional_original_flags =  $(if $(findstring thin,$(1)),-DLLVM_ENABLE_LTO=Thin) \
-														 $(if $(findstring full,$(1)),-DLLVM_ENABLE_LTO=Full) \
-														 -DLLVM_PROFDATA_FILE=$(PWD)/instrumented.profdata
+							 $(if $(findstring full,$(1)),-DLLVM_ENABLE_LTO=Full) \
+							  -DLLVM_PROFDATA_FILE=$(PWD)/instrumented.profdata
 
 $(eval $(call gen_pgo_targets,thin))
 $(eval $(call gen_pgo_targets,full))

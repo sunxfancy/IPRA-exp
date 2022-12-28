@@ -186,3 +186,8 @@ define mv_binary
 	-cp  $(BUILD_DIR)/$(1)/$(MAIN_BIN).7  $(PWD)/$(1)/$(MAIN_BIN).10-20
 endef
 
+clean:
+	rm -rf $(OUTPUT_PATH)/benchmarks/$(BENCHMARK).output  $(OUTPUT_PATH)/benchmarks/$(BENCHMARK).raw  $(OUTPUT_PATH)/benchmarks/$(BENCHMARK) $(BUILD_PATH)/$(BENCHMARK) 
+
+clean-tmp:
+	rm -rf $(BUILD_PATH)/$(BENCHMARK) 

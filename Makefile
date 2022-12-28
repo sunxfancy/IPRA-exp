@@ -184,6 +184,9 @@ build/singularity-ce: download/singularity-ce
 singularity/image:
 	cd singularity && sudo singularity build -F image.sif IPRA.def
 
+singularity/run:
+	singularity exec singularity/image.sif bash
+
 # upload to HPCC
 upload:
 	scp -pr $(INSTALL_PATH) $(HPCC_USER)@$(HPCC_HOST):/rhome/xsun042/bigdata/IPRA-exp
@@ -230,9 +233,11 @@ install/ppcount:
 	cd build/ppcount && cmake -DDynamoRIO_DIR=$(INSTALL_PATH)/DynamoRIO-Linux-9.0.19328/cmake -G Ninja ../../push-pop-counter
 	cd build/ppcount && ninja
 
+clean:
+	rm -rf $(OUTPUT_PATH) $(BUILD_PATH)
 
 deepclean:
-	rm -rf build/ install/ tmp/
+	rm -rf $(OUTPUT_PATH) $(BUILD_PATH) $(INSTALL_PATH)
 
 include benchmarks/build.mk
 include example/build.mk
