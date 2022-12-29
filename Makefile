@@ -189,19 +189,18 @@ singularity/run:
 
 # upload to HPCC
 upload:
-	scp -pr $(INSTALL_PATH) $(HPCC_USER)@$(HPCC_HOST):/rhome/xsun042/bigdata/IPRA-exp
-	scp -pr ./benchmarks $(HPCC_USER)@$(HPCC_HOST):/rhome/xsun042/bigdata/IPRA-exp
-	scp -pr ./singularity $(HPCC_USER)@$(HPCC_HOST):/rhome/xsun042/bigdata/IPRA-exp
-	scp -pr ./example $(HPCC_USER)@$(HPCC_HOST):/rhome/xsun042/bigdata/IPRA-exp
-	scp Makefile $(HPCC_USER)@$(HPCC_HOST):/rhome/xsun042/bigdata/IPRA-exp/
+	scp -pr ./Makefile ./make $(INSTALL_PATH) ./benchmarks ./singularity ./example $(HPCC_USER)@$(HPCC_HOST):/rhome/xsun042/bigdata/IPRA-exp
+
+# scp -pr ./benchmarks $(HPCC_USER)@$(HPCC_HOST):/rhome/xsun042/bigdata/IPRA-exp
+# scp -pr ./singularity $(HPCC_USER)@$(HPCC_HOST):/rhome/xsun042/bigdata/IPRA-exp
+# scp -pr ./example $(HPCC_USER)@$(HPCC_HOST):/rhome/xsun042/bigdata/IPRA-exp
+# scp Makefile $(HPCC_USER)@$(HPCC_HOST):/rhome/xsun042/bigdata/IPRA-exp/
 
 upload-image:
 	scp -pr ./singularity $(HPCC_USER)@$(HPCC_HOST):/rhome/xsun042/bigdata/IPRA-exp
 
 upload-bench:
-	scp -pr ./benchmarks $(HPCC_USER)@$(HPCC_HOST):/rhome/xsun042/bigdata/IPRA-exp
-	scp Makefile $(HPCC_USER)@$(HPCC_HOST):/rhome/xsun042/bigdata/IPRA-exp/
-	scp make.sh $(HPCC_USER)@$(HPCC_HOST):/rhome/xsun042/bigdata/IPRA-exp/
+	scp -pr ./Makefile ./make ./benchmarks $(HPCC_USER)@$(HPCC_HOST):/rhome/xsun042/bigdata/IPRA-exp
 
 hpcc: upload-bench
 	ssh $(HPCC_USER)@$(HPCC_HOST) "cd /rhome/xsun042/bigdata/IPRA-exp && \
