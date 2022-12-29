@@ -27,7 +27,7 @@ BUILD_TARGET=mysqld
 
 define switch_binary
 	if [ ! -d "$(INSTALL_DIR)/bin" ]; then \
-		mkdir -p $(BUILD_PATH)/$(BENCHMARK) && cp -sr $(PWD)/install.dir $(BUILD_PATH)/$(BENCHMARK)/; fi
+		mkdir -p $(BUILD_PATH)/$(BENCHMARK) && cp -r $(PWD)/install.dir $(BUILD_PATH)/$(BENCHMARK)/; fi
 	rm -f $(INSTALL_DIR)/$(MAIN_BIN)
 	cp $(PWD)/$(1)/$(MAIN_BIN)$(2) $(INSTALL_DIR)/$(MAIN_BIN)
 endef
@@ -93,13 +93,16 @@ $(1)$(2).perfdata: $(1)
 	$(call switch_binary,$(1),$(2))
 	cp -f $(mkfile_path)loadtest-funcs.sh ./loadtest-funcs.sh
 	$(call copy_to_server,$(1),$(2))
-	$(RUN) ./loadtest-funcs.sh setup_mysql $(1) 2>&1
 	cd $(BUILD_PATH)/$(BENCHMARK) && \
-		bash "$(mkfile_path)loadtest-funcs.sh" run_perf -o "$(PWD)/$$@" -- \
+		$(RUN) $(mkfile_path)loadtest-funcs.sh setup_mysql $(1) 2>&1
+	cd $(BUILD_PATH)/$(BENCHMARK) && \
+		bash "$(mkfile_path)loadtest-funcs.sh" run_perf -o "$(BUILD_PATH)/$(BENCHMARK)/$$@" -- \
 		bash "$(mkfile_path)loadtest-funcs.sh" run_sysbench_loadtest "$(1)$(2)" \
 		|| { echo "*** loadtest failed ***" ; rm -f $(PWD)/$$@ ; exit 1; }
 	$(COPY_BACK) $(PWD)/$$@
 	$(RUN_ON_REMOTE) rm -rf $(PWD)/
+	rm -rf $$@ 
+	mv $(BUILD_PATH)/$(BENCHMARK)/$$@ $$@
 
 endef
 
@@ -115,6 +118,8 @@ $(1)$(2).bench: $(1)
 	$(RUN_FOR_REMOTE) mkdir -p $(BENCH_DIR)/
 	$(COPY_BACK) $(BENCH_DIR)/$(1)$(2)
 	$(RUN_ON_REMOTE) rm -rf $(PWD)/
+	rm -rf $$@ 
+	mv $(BUILD_PATH)/$(BENCHMARK)/$$@ $$@
 
 endef 
 
