@@ -77,14 +77,13 @@ endef
 
 
 define copy_to_server
-	/bin/cp -f $(mkfile_path)loadtest-funcs.sh ./loadtest-funcs.sh
 	$(RUN_FOR_REMOTE) cp $(mkfile_path)loadtest-funcs-remote.sh ./loadtest-funcs.sh
 	$(COPY_TO_REMOTE) /tmp/IPRA-exp/sysbench/
 	$(COPY_TO_REMOTE) $(PWD)/loadtest-funcs.sh 
 	$(COPY_TO_REMOTE) $(INSTALL_DIR)/
 	$(COPY_TO_REMOTE) $(PWD)/$(1)/$(MAIN_BIN)$(2)
 	$(COPY_TO_REMOTE) $(INSTALL_PATH)/sub
-	$(RUN) ./loadtest-funcs.sh setup_mysql $(1) 2>&1
+	
 endef
 
 
@@ -92,7 +91,9 @@ define gen_perfdata
 
 $(1)$(2).perfdata: $(1) 
 	$(call switch_binary,$(1),$(2))
+	cp -f $(mkfile_path)loadtest-funcs.sh ./loadtest-funcs.sh
 	$(call copy_to_server,$(1),$(2))
+	$(RUN) ./loadtest-funcs.sh setup_mysql $(1) 2>&1
 	cd $(BUILD_PATH)/$(BENCHMARK) && \
 		bash "$(mkfile_path)loadtest-funcs.sh" run_perf -o "$(PWD)/$$@" -- \
 		bash "$(mkfile_path)loadtest-funcs.sh" run_sysbench_loadtest "$(1)$(2)" \
@@ -106,7 +107,9 @@ define gen_bench
 
 $(1)$(2).bench: $(1)
 	$(call switch_binary,$(1),$(2))
+	cp -f $(mkfile_path)loadtest-funcs.sh ./loadtest-funcs.sh
 	$(call copy_to_server,$(1),$(2))
+	$(RUN) ./loadtest-funcs.sh setup_mysql $(1) 2>&1
 	cd $(BUILD_PATH)/$(BENCHMARK) && \
 	$(RUN) ./loadtest-funcs.sh run_sysbench_benchmark $(1)$(2) 5 
 	$(RUN_FOR_REMOTE) mkdir -p $(BENCH_DIR)/
