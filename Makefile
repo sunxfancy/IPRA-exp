@@ -1,5 +1,5 @@
 AUTOFDO_BUILD_TYPE=Release
-LLVM_BUILD_TYPE=Release
+LLVM_BUILD_TYPE=RelWithDebInfo
 
 PWD=$(shell pwd)
 FDO=install/FDO
@@ -25,6 +25,13 @@ UMAKE := $(PWD)/install/UMake
 HPCC_HOST:=cluster.hpcc.ucr.edu
 HPCC_USER:=xsun042
 
+# BUILD_PATH = /tmp/IPRA-exp
+# BUILD_PATH = /scratch
+OUTPUT_PATH = $(PWD)/build
+BUILD_PATH = $(PWD)/tmp
+INSTALL_PATH = $(PWD)/install
+
+
 TASKSET:=
 # TASKSET:=$(TASKSET)
 
@@ -49,16 +56,11 @@ endif
 
 # Use mold to speed up linking
 # MOLD:= mold -run
-MOLD:= 
+MOLD:= $(INSTALL_PATH)/mold-1.8.0-x86_64-linux/bin/mold -run
 
 .PHONY: build check-tools install/llvm install/autofdo install/counter install/clang_proxy install/count-sum
 build: check-tools  install/llvm install/autofdo install/counter install/clang_proxy install/count-sum
 
-# BUILD_PATH = /tmp/IPRA-exp
-# BUILD_PATH = /scratch
-OUTPUT_PATH = $(PWD)/build
-BUILD_PATH = $(PWD)/tmp
-INSTALL_PATH = $(PWD)/install
 
 DRRUN:=$(INSTALL_PATH)/DynamoRIO-Linux-9.0.19328/bin64/drrun -debug -loglevel 1 -c $(INSTALL_PATH)/../build/ppcount/libppcount.so -- 
 
@@ -109,8 +111,26 @@ build/autofdo: autofdo install/llvm
 	mkdir -p build
 	cmake -G Ninja -B $(BUILD_PATH)/autofdo -S autofdo \
 		-DCMAKE_BUILD_TYPE=${AUTOFDO_BUILD_TYPE} \
+		-DBUILD_SHARED_LIBS=OFF \
 		-DLLVM_PATH=$(INSTALL_PATH)/llvm \
 		-DCMAKE_INSTALL_PREFIX=$(INSTALL_PATH)/autofdo 
+
+# $(BUILD_PATH)/mold-build/build.ninja:
+# 	cd $(BUILD_PATH)/ && git clone https://github.com/rui314/mold.git
+# 	mkdir -p $(BUILD_PATH)/mold-build
+# 	cd $(BUILD_PATH)/mold-build && ../install-build-deps.sh
+# 	cmake -G Ninja -B $(BUILD_PATH)/mold-build -S $(BUILD_PATH)/mold \
+# 		-DCMAKE_BUILD_TYPE=Release \
+# 		-DCMAKE_INSTALL_PREFIX=$(INSTALL_PATH)/mold
+# 	cmake --build $(BUILD_PATH)/mold-build --config Release -j $(shell nproc)
+
+# install/mold: $(BUILD_PATH)/mold-build/build.ninja
+# 	cmake --build $(BUILD_PATH)/mold-build --config Release --target install
+
+install/mold:
+	cd $(INSTALL_PATH)/ && wget https://github.com/rui314/mold/releases/download/v1.8.0/mold-1.8.0-x86_64-linux.tar.gz
+	cd $(INSTALL_PATH)/ && tar -xvf mold-1.8.0-x86_64-linux.tar.gz
+
 
 install/llvm: $(BUILD_PATH)/llvm/build.ninja
 	mkdir -p install/llvm
@@ -125,12 +145,13 @@ $(BUILD_PATH)/llvm/build.ninja: LLVM-IPRA
 		-DBUILD_SHARED_LIBS=OFF \
 		-DLLVM_INCLUDE_TESTS=ON \
 		-DLLVM_BUILD_TESTS=ON \
+		-DLLVM_CCACHE_BUILD=ON \
+		-DLLVM_PARALLEL_LINK_JOBS=8 \
 		-DLLVM_OPTIMIZED_TABLEGEN=ON \
 		-DLLVM_TARGETS_TO_BUILD="X86" \
 		-DLLVM_ENABLE_RTTI=ON \
 		-DLLVM_ENABLE_PROJECTS="clang;lld;llvm;compiler-rt;bolt" \
 		-DCMAKE_INSTALL_PREFIX=$(INSTALL_PATH)/llvm \
-		-DLLVM_CCACHE_BUILD=OFF \
 		-DCMAKE_EXPORT_COMPILE_COMMANDS=1
 
 # -DCMAKE_C_COMPILER=clang \
@@ -189,7 +210,7 @@ singularity/run:
 
 # upload to HPCC
 upload:
-	scp -pr ./Makefile ./make $(INSTALL_PATH) ./benchmarks ./singularity ./example $(HPCC_USER)@$(HPCC_HOST):/rhome/xsun042/bigdata/IPRA-exp
+	tar cf - ./Makefile ./make $(INSTALL_PATH) ./benchmarks ./singularity ./example  ssh $(HPCC_USER)@$(HPCC_HOST)   "/rhome/xsun042/bigdata/IPRA-exp && tar xvf -"
 
 # scp -pr ./benchmarks $(HPCC_USER)@$(HPCC_HOST):/rhome/xsun042/bigdata/IPRA-exp
 # scp -pr ./singularity $(HPCC_USER)@$(HPCC_HOST):/rhome/xsun042/bigdata/IPRA-exp
@@ -201,6 +222,9 @@ upload-image:
 
 upload-bench:
 	scp -pr ./Makefile ./make ./benchmarks $(HPCC_USER)@$(HPCC_HOST):/rhome/xsun042/bigdata/IPRA-exp
+
+upload-autofdo:
+	scp -pr $(INSTALL_PATH)/autofdo  $(HPCC_USER)@$(HPCC_HOST):/rhome/xsun042/bigdata/IPRA-exp/install
 
 hpcc: upload-bench
 	ssh $(HPCC_USER)@$(HPCC_HOST) "cd /rhome/xsun042/bigdata/IPRA-exp && \

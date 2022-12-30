@@ -4,7 +4,7 @@ From: ubuntu:22.04
 %post
     apt-get -y update
     DEBIAN_FRONTEND=noninteractive TZ=Etc/UTC apt-get -y install tzdata
-    apt-get -y install linux-tools-generic file net-tools
+    apt-get -y install linux-tools-generic file net-tools ccache
     apt-get -y install build-essential cmake ninja-build golang sysbench flex bison lldb
     apt-get -y install wget unzip python3 time software-properties-common 
     apt-get -y install libunwind-dev libgflags-dev libssl-dev libelf-dev libprotobuf-dev protobuf-compiler

@@ -23,7 +23,7 @@ endef
 
 define build_gcc
 	mkdir -p $(BUILD_DIR)/$(1)
-	mkdir -p $(PWD)/$(1)/gcc
+	mkdir -p $(PWD)/$(1)/$(BENCHMARK)
 	mkdir -p $(INSTALL_DIR)
 	rm -f $(PWD)/$(1).count-push-pop 
 	touch $(PWD)/$(1).count-push-pop
@@ -70,8 +70,9 @@ endef
 
 define run_bench
 	if [ ! -d "$(BENCH_DIR)" ]; then \
+		cd $(ROOT) && $(MAKE) benchmarks/dparser/dparser-master && \
 		mkdir -p $(BENCH_DIR) && \
-		cd $(BENCH_DIR) && cmake -G Ninja $(PWD)/../dparser/dparser-master \
+		cd $(BENCH_DIR) && cmake -G Ninja $(BUILD_PATH)/dparser/dparser-master \
 			-DCMAKE_BUILD_TYPE=RelWithDebInfo \
 			-DCMAKE_C_FLAGS="-fPIE" \
 			-DCMAKE_C_COMPILER=$(1)/gcc \
@@ -100,6 +101,7 @@ define gen_perfdata
 
 $(1)$(2).perfdata: $(1) 
 	$(call switch_binary,$(1),$(2))
+	$(call run_bench,$(INSTALL_DIR)/bin)
 	$(call copy_to_server,$(1),$(2))
 	cd $(BENCH_DIR) && $(PERF) record -e cycles:u -j any,u -o ../$$@ -- $(TASKSET) bash ./perf_commands.sh
 	$(COPY_BACK) $(PWD)/$$@
@@ -113,6 +115,7 @@ define gen_bench
 
 $(1)$(2).bench: $(1)
 	$(call switch_binary,$(1),$(2))
+	$(call run_bench,$(INSTALL_DIR)/bin)
 	$(call copy_to_server,$(1),$(2))
 	cd $(BENCH_DIR) && $(PERF) stat $(PERF_EVENTS) -o ../$$@ -r5 -- $(TASKSET) bash ./perf_commands.sh
 	$(COPY_BACK) $(PWD)/$$@
@@ -146,7 +149,6 @@ instrumented.profdata:  instrumented
 
 $(GCC_NAME).zip:
 	wget https://github.com/gcc-mirror/gcc/archive/refs/tags/releases/$(GCC_NAME).zip
-	cd $(ROOT) && $(MAKE) benchmarks/dparser/dparser-master
 
 $(SOURCE)/.complete: $(GCC_NAME).zip
 	mkdir -p $(BUILD_PATH)/$(BENCHMARK)
