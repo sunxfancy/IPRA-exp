@@ -131,6 +131,9 @@ install/mold:
 	cd $(INSTALL_PATH)/ && wget https://github.com/rui314/mold/releases/download/v1.8.0/mold-1.8.0-x86_64-linux.tar.gz
 	cd $(INSTALL_PATH)/ && tar -xvf mold-1.8.0-x86_64-linux.tar.gz
 
+llvm: $(BUILD_PATH)/llvm/build.ninja
+	$(MOLD) cmake --build $(BUILD_PATH)/llvm --config ${LLVM_BUILD_TYPE} -j $(shell nproc) --target clang
+	cp $(BUILD_PATH)/llvm/bin/clang-16 install/llvm/bin/clang-16
 
 install/llvm: $(BUILD_PATH)/llvm/build.ninja
 	mkdir -p install/llvm
