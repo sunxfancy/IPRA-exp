@@ -1,5 +1,5 @@
 mkfile_path := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
-.PHONY: all thread
+.PHONY: all thread switch
 
 all: 
 	$(NCC) -O3 -S \
@@ -33,3 +33,12 @@ thread-cpp:
 		-mllvm -EnablePushPopProfile \
 		-mllvm -EnableSpillBytesProfile \
 		-o thread.S $(mkfile_path)thread.cpp 
+
+switch:
+	$(NCC) -O3 -S \
+		-mllvm -debug-only=reg-profiler \
+		-mllvm -EnablePushPopProfile \
+		-mllvm -EnableSpillBytesProfile \
+		-o switch.S $(mkfile_path)switch.c 
+	$(NCC) switch.S $(ROOT)/push-pop-counter/lib.o -o switch 
+	./switch

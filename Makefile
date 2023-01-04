@@ -185,6 +185,9 @@ install/process_cmd: utils/process_cmd.go
 	cd utils && go build process_cmd.go
 	mv utils/process_cmd $(INSTALL_PATH)/process_cmd
 
+install/voltron:
+	cd $(INSTALL_PATH)/ && wget https://github.com/snare/voltron/archive/refs/heads/master.zip -O voltron.zip && unzip voltron.zip
+	cd $(INSTALL_PATH)/voltron-master && ./install.sh
 
 install/clang_proxy: utils/clang_proxy.go $(BUILD_PATH)/llvm/build.ninja
 	mkdir -p $(INSTALL_PATH)

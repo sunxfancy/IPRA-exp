@@ -27,7 +27,7 @@ define build_clang
 	rm -f $(PWD)/$(1).count-push-pop 
 	touch $(PWD)/$(1).count-push-pop
 	cd $(BUILD_DIR)/$(1) && cmake -G Ninja $(SOURCE) \
-		-DCMAKE_BUILD_TYPE=Release \
+		-DCMAKE_BUILD_TYPE=RelWithDebInfo \
 		-DLLVM_OPTIMIZED_TABLEGEN=ON \
 		-DLLVM_TARGETS_TO_BUILD="X86" \
 		-DLLVM_ENABLE_RTTI=OFF \
@@ -109,6 +109,22 @@ $(1)$(2).perfdata: $(1)
 	rm -rf $$@ 
 	mv $(BUILD_PATH)/$(BENCHMARK)/$$@ $$@
 
+$(1)$(2).regprof2: $(1)
+	$(call switch_binary,$(1),$(2))
+	$(call clang_bench,$(INSTALL_DIR)/bin)
+	$(call copy_to_server,$(1),$(2))
+	mkdir -p $(BENCH_DIR) && cd $(BENCH_DIR) && \
+		$(PERF) record -e cycles:u -j any,u -o ../$$@ -- $(TASKSET) bash ./perf_commands.sh
+	$(COPY_BACK) $(PWD)/$$@
+	$(RUN_ON_REMOTE) rm -rf $(BENCH_DIR)
+	rm -rf $$@ 
+	mv $(BUILD_PATH)/$(BENCHMARK)/$$@ $$@
+
+$(1)$(2).regprof3: $(1).profbuild
+	$(call switch_binary,$(1).profbuild,$(2))
+	$(call clang_bench,$(INSTALL_DIR)/bin)
+	mkdir -p $(BENCH_DIR) && cd $(BENCH_DIR) && bash ./perf_commands.sh > $(PWD)/$$@
+
 endef
 
 define gen_bench
@@ -156,3 +172,13 @@ $(SOURCE)/.complete: $(CLANG_VERSION).zip
 	mkdir -p $(BUILD_PATH)/$(BENCHMARK)
 	cd $(BUILD_PATH)/$(BENCHMARK) && unzip -q -o $(PWD)/$<
 	touch $@
+
+compare1:
+	cd /home/riple/IPRA-exp/tmp/clang/build.dir/pgo-full           && lldb -- /home/riple/IPRA-exp/tmp/clang/build.dir/pgo-full/bin/clang-tblgen -gen-clang-basic-reader -I /home/riple/IPRA-exp/tmp/clang/llvm-project-llvmorg-15.0.3/clang/include/clang/AST -I/home/riple/IPRA-exp/tmp/clang/llvm-project-llvmorg-15.0.3/clang/include -I/home/riple/IPRA-exp/tmp/clang/build.dir/pgo-full/tools/clang/include -I/home/riple/IPRA-exp/tmp/clang/build.dir/pgo-full.profbuild/include -I/home/riple/IPRA-exp/tmp/clang/llvm-project-llvmorg-15.0.3/llvm/include /home/riple/IPRA-exp/tmp/clang/llvm-project-llvmorg-15.0.3/clang/include/clang/AST/PropertiesBase.td --write-if-changed -o tools/clang/include/clang/AST/AbstractBasicReader.inc -d tools/clang/include/clang/AST/AbstractBasicReader.inc.d
+
+compare2:
+	cd /home/riple/IPRA-exp/tmp/clang/build.dir/pgo-full.profbuild && lldb -- /home/riple/IPRA-exp/tmp/clang/build.dir/pgo-full.profbuild/bin/clang-tblgen -gen-clang-basic-reader -I /home/riple/IPRA-exp/tmp/clang/llvm-project-llvmorg-15.0.3/clang/include/clang/AST -I/home/riple/IPRA-exp/tmp/clang/llvm-project-llvmorg-15.0.3/clang/include -I/home/riple/IPRA-exp/tmp/clang/build.dir/pgo-full.profbuild/tools/clang/include -I/home/riple/IPRA-exp/tmp/clang/build.dir/pgo-full.profbuild/include -I/home/riple/IPRA-exp/tmp/clang/llvm-project-llvmorg-15.0.3/llvm/include /home/riple/IPRA-exp/tmp/clang/llvm-project-llvmorg-15.0.3/clang/include/clang/AST/PropertiesBase.td --write-if-changed -o tools/clang/include/clang/AST/AbstractBasicReader.inc -d tools/clang/include/clang/AST/AbstractBasicReader.inc.d
+
+compare:
+	@tmux new-session -d /bin/bash -c "cd /home/riple/IPRA-exp/tmp/clang/build.dir/pgo-full           && lldb -- /home/riple/IPRA-exp/tmp/clang/build.dir/pgo-full/bin/clang-tblgen -gen-clang-basic-reader -I /home/riple/IPRA-exp/tmp/clang/llvm-project-llvmorg-15.0.3/clang/include/clang/AST -I/home/riple/IPRA-exp/tmp/clang/llvm-project-llvmorg-15.0.3/clang/include -I/home/riple/IPRA-exp/tmp/clang/build.dir/pgo-full/tools/clang/include -I/home/riple/IPRA-exp/tmp/clang/build.dir/pgo-full.profbuild/include -I/home/riple/IPRA-exp/tmp/clang/llvm-project-llvmorg-15.0.3/llvm/include /home/riple/IPRA-exp/tmp/clang/llvm-project-llvmorg-15.0.3/clang/include/clang/AST/PropertiesBase.td --write-if-changed -o tools/clang/include/clang/AST/AbstractBasicReader.inc -d tools/clang/include/clang/AST/AbstractBasicReader.inc.d" \; \
+	     split-window -h /bin/bash -c "cd /home/riple/IPRA-exp/tmp/clang/build.dir/pgo-full.profbuild && lldb -- /home/riple/IPRA-exp/tmp/clang/build.dir/pgo-full.profbuild/bin/clang-tblgen -gen-clang-basic-reader -I /home/riple/IPRA-exp/tmp/clang/llvm-project-llvmorg-15.0.3/clang/include/clang/AST -I/home/riple/IPRA-exp/tmp/clang/llvm-project-llvmorg-15.0.3/clang/include -I/home/riple/IPRA-exp/tmp/clang/build.dir/pgo-full.profbuild/tools/clang/include -I/home/riple/IPRA-exp/tmp/clang/build.dir/pgo-full.profbuild/include -I/home/riple/IPRA-exp/tmp/clang/llvm-project-llvmorg-15.0.3/llvm/include /home/riple/IPRA-exp/tmp/clang/llvm-project-llvmorg-15.0.3/clang/include/clang/AST/PropertiesBase.td --write-if-changed -o tools/clang/include/clang/AST/AbstractBasicReader.inc -d tools/clang/include/clang/AST/AbstractBasicReader.inc.d" \; attach

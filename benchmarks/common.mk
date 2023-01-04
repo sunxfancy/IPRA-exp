@@ -162,7 +162,23 @@ pgo-$(1)-ipra: instrumented.profdata | $(SOURCE)/.complete
 		,$$(BUILD_TARGET)\
 		,$(call GEN_ARGS,pgo-$(1)-ipra))
 	touch $$@
-	
+
+pgo-$(1).profbuild: instrumented.profdata | $(SOURCE)/.complete
+	$(call $(BUILD_ACTION),$$@,\
+		$(call gen_build_flags,,pgo-$(1),-mllvm -EnablePushPopProfile -mllvm -EnableSpillBytesProfile,\
+			-Wl$(COMMA)-mllvm -Wl$(COMMA)-EnablePushPopProfile -Wl$(COMMA)-mllvm -Wl$(COMMA)-EnableSpillBytesProfile $(ROOT)/push-pop-counter/lib.o)\
+		,$$(BUILD_TARGET)\
+		,$(call GEN_ARGS,pgo-$(1)))
+	touch $$@
+
+pgo-$(1)-ipra.profbuild: instrumented.profdata | $(SOURCE)/.complete
+	$(call $(BUILD_ACTION),$$@,\
+		$(call gen_build_flags,ipra,pgo-$(1)-ipra,-mllvm -EnablePushPopProfile -mllvm -EnableSpillBytesProfile,\
+			-Wl$(COMMA)-mllvm -Wl$(COMMA)-EnablePushPopProfile -Wl$(COMMA)-mllvm -Wl$(COMMA)-EnableSpillBytesProfile  $(ROOT)/push-pop-counter/lib.o)\
+		,$$(BUILD_TARGET)\
+		,$(call GEN_ARGS,pgo-$(1)-ipra))
+	touch $$@
+
 $(foreach j,$(HOT_LIST_VAR),$(call gen_hot_list,pgo-$(1),$(j)))
 $(foreach f,$(FDOIPRA_FLAVORS),$(call gen_pgo_target,$(f),$(1)))
 $(call gen_perfdata,pgo-$(1))
