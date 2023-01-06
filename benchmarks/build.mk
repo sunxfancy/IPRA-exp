@@ -5,7 +5,7 @@ benchmarks: benchmarks/clang/regprof benchmarks/mysql/regprof benchmarks/gcc/reg
 
 benchmarks-build: benchmarks/clang/build benchmarks/mysql/build benchmarks/gcc/build # benchmarks/SPEC
 
-FDOIPRA_FLAVORS := fdoipra fdoipra2 fdoipra3 bfdoipra bfdoipra2 bfdoipra3
+FDOIPRA_FLAVORS := fdoipra bfdoipra fdoipra2 bfdoipra2 fdoipra3 bfdoipra3 fdoipra4 bfdoipra4 fdoipra5 bfdoipra5 fdoipra6 bfdoipra6
 PGO_FULL_FLAVORS := pgo-full $(foreach f,$(FDOIPRA_FLAVORS),pgo-full-$(f)) pgo-full-ipra
 PGO_THIN_FLAVORS := pgo-thin $(foreach f,$(FDOIPRA_FLAVORS),pgo-thin-$(f)) pgo-thin-ipra
 FLAVORS := $(PGO_FULL_FLAVORS)
@@ -28,6 +28,9 @@ LINKER_FLAGS_CH:= -Wl,-mllvm -Wl,-fdoipra-ch=1
 COMPILER_FLAGS_HC:= -mllvm -fdoipra-hc=1
 LINKER_FLAGS_HC:= -Wl,-mllvm -Wl,-fdoipra-hc=1
 
+COMPILER_FLAGS_CALLER:= -mllvm -fdoipra-use-caller-reg=1
+LINKER_FLAGS_CALLER:= -Wl,-mllvm -Wl,-fdoipra-use-caller-reg=1
+
 COMPILER_FLAGS_FDOIPRA2:= $(COMPILER_FLAGS_FDOIPRA) $(COMPILER_FLAGS_CH)
 LINKER_FLAGS_FDOIPRA2:= $(LINKER_FLAGS_FDOIPRA) $(LINKER_FLAGS_CH)
 
@@ -39,6 +42,25 @@ LINKER_FLAGS_FDOIPRA3:= $(LINKER_FLAGS_FDOIPRA2) $(LINKER_FLAGS_HC)
 
 COMPILER_FLAGS_BFDOIPRA3:=  $(COMPILER_FLAGS_BFDOIPRA2) $(COMPILER_FLAGS_HC)
 LINKER_FLAGS_BFDOIPRA3:= $(LINKER_FLAGS_BFDOIPRA2) $(LINKER_FLAGS_HC)
+
+COMPILER_FLAGS_FDOIPRA4:= $(COMPILER_FLAGS_FDOIPRA) $(COMPILER_FLAGS_CALLER)
+LINKER_FLAGS_FDOIPRA4:= $(LINKER_FLAGS_FDOIPRA) $(LINKER_FLAGS_CALLER)
+
+COMPILER_FLAGS_BFDOIPRA4:=  $(COMPILER_FLAGS_BFDOIPRA) $(COMPILER_FLAGS_CALLER)
+LINKER_FLAGS_BFDOIPRA4:= $(LINKER_FLAGS_BFDOIPRA) $(LINKER_FLAGS_CALLER)
+
+COMPILER_FLAGS_FDOIPRA5:= $(COMPILER_FLAGS_FDOIPRA2) $(COMPILER_FLAGS_CALLER)
+LINKER_FLAGS_FDOIPRA5:= $(LINKER_FLAGS_FDOIPRA2) $(LINKER_FLAGS_CALLER)
+
+COMPILER_FLAGS_BFDOIPRA5:=  $(COMPILER_FLAGS_BFDOIPRA2) $(COMPILER_FLAGS_CALLER)
+LINKER_FLAGS_BFDOIPRA5:= $(LINKER_FLAGS_BFDOIPRA2) $(LINKER_FLAGS_CALLER)
+
+COMPILER_FLAGS_FDOIPRA6:= $(COMPILER_FLAGS_FDOIPRA3) $(COMPILER_FLAGS_CALLER)
+LINKER_FLAGS_FDOIPRA6:= $(LINKER_FLAGS_FDOIPRA3) $(LINKER_FLAGS_CALLER)
+
+COMPILER_FLAGS_BFDOIPRA6:=  $(COMPILER_FLAGS_BFDOIPRA3) $(COMPILER_FLAGS_CALLER)
+LINKER_FLAGS_BFDOIPRA6:= $(LINKER_FLAGS_BFDOIPRA3) $(LINKER_FLAGS_CALLER)
+
 
 PERF_EVENTS:= -e instructions,cycles,L1-icache-misses,iTLB-misses,L1-dcache-loads,L1-dcache-load-misses,dTLB-load-misses,L1-dcache-stores,L1-dcache-store-misses,dTLB-store-misses,branches,branch-misses,page-faults,context-switches,cpu-migrations
 CONFIG:=$(PWD)/benchmarks/cfg

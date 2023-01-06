@@ -27,7 +27,7 @@ define build_clang
 	rm -f $(PWD)/$(1).count-push-pop 
 	touch $(PWD)/$(1).count-push-pop
 	cd $(BUILD_DIR)/$(1) && cmake -G Ninja $(SOURCE) \
-		-DCMAKE_BUILD_TYPE=RelWithDebInfo \
+		-DCMAKE_BUILD_TYPE=Release \
 		-DLLVM_OPTIMIZED_TABLEGEN=ON \
 		-DLLVM_TARGETS_TO_BUILD="X86" \
 		-DLLVM_ENABLE_RTTI=OFF \
@@ -123,7 +123,8 @@ $(1)$(2).regprof2: $(1)
 $(1)$(2).regprof3: $(1).profbuild
 	$(call switch_binary,$(1).profbuild,$(2))
 	$(call clang_bench,$(INSTALL_DIR)/bin)
-	mkdir -p $(BENCH_DIR) && cd $(BENCH_DIR) && bash ./perf_commands.sh > $(PWD)/$$@
+	mkdir -p $(BENCH_DIR) && cd $(BENCH_DIR) && bash ./perf_commands.sh > $(PWD)/$$@.raw
+	cat $(PWD)/$$@.raw | $(COUNTSUM) > $(PWD)/$$@
 
 endef
 

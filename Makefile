@@ -1,5 +1,5 @@
 AUTOFDO_BUILD_TYPE=Release
-LLVM_BUILD_TYPE=RelWithDebInfo
+LLVM_BUILD_TYPE=Release
 
 PWD=$(shell pwd)
 FDO=install/FDO
@@ -59,7 +59,7 @@ endif
 MOLD:= $(INSTALL_PATH)/mold-1.8.0-x86_64-linux/bin/mold -run
 
 .PHONY: build check-tools install/llvm install/autofdo install/counter install/clang_proxy install/count-sum
-build: check-tools  install/llvm install/autofdo install/counter install/clang_proxy install/count-sum
+build: check-tools  install/llvm install/autofdo install/counter install/clang_proxy install/count-sum install/DynamoRIO install/ppcount push-pop-counter/lib.o
 
 
 DRRUN:=$(INSTALL_PATH)/DynamoRIO-Linux-9.0.19328/bin64/drrun -debug -loglevel 1 -c $(INSTALL_PATH)/../build/ppcount/libppcount.so -- 
@@ -96,8 +96,8 @@ endef
 #     $(eval $(call lib-available,HAS_elf,libelf-dev))
 #     $(eval $(call lib-available,HAS_protobuf,protobuf-compiler))
 
-install/autofdo: build/autofdo
-	$(MOLD) cd $(BUILD_PATH)/autofdo && ninja 
+install/autofdo: build/autofdo install/mold
+	cd $(BUILD_PATH)/autofdo && $(MOLD) ninja 
 	cd $(BUILD_PATH)/autofdo && ninja install
 	cd autofdo && $(BUILD_PATH)/autofdo/reg_profiler_test
 	mkdir -p install/autofdo
@@ -130,12 +130,13 @@ build/autofdo: autofdo install/llvm
 install/mold:
 	cd $(INSTALL_PATH)/ && wget https://github.com/rui314/mold/releases/download/v1.8.0/mold-1.8.0-x86_64-linux.tar.gz
 	cd $(INSTALL_PATH)/ && tar -xvf mold-1.8.0-x86_64-linux.tar.gz
+	touch $@
 
-llvm: $(BUILD_PATH)/llvm/build.ninja
+llvm: $(BUILD_PATH)/llvm/build.ninja install/mold
 	$(MOLD) cmake --build $(BUILD_PATH)/llvm --config ${LLVM_BUILD_TYPE} -j $(shell nproc) --target clang
 	cp $(BUILD_PATH)/llvm/bin/clang-16 install/llvm/bin/clang-16
 
-install/llvm: $(BUILD_PATH)/llvm/build.ninja
+install/llvm: $(BUILD_PATH)/llvm/build.ninja install/mold
 	mkdir -p install/llvm
 	$(MOLD) cmake --build $(BUILD_PATH)/llvm --config ${LLVM_BUILD_TYPE} -j $(shell nproc) --target install
 	$(MOLD) cmake --build $(BUILD_PATH)/llvm --config ${LLVM_BUILD_TYPE} -j $(shell nproc) --target install-profile
@@ -159,6 +160,9 @@ $(BUILD_PATH)/llvm/build.ninja: LLVM-IPRA
 
 # -DCMAKE_C_COMPILER=clang \
 # -DCMAKE_CXX_COMPILER=clang++ \
+
+push-pop-counter/lib.o: push-pop-counter/lib.c
+	gcc -c -O3 push-pop-counter/lib.c -o $(BUILD_PATH)/push-pop-counter/lib.o
 
 build/UMake: UMake
 	mkdir -p $(BUILD_PATH)/UMake
@@ -214,9 +218,14 @@ singularity/image:
 singularity/run:
 	singularity exec singularity/image.sif bash
 
+login:
+	ssh $(HPCC_USER)@$(HPCC_HOST)
+
 # upload to HPCC
 upload:
-	tar cf - ./Makefile ./make $(INSTALL_PATH) ./benchmarks ./singularity ./example  ssh $(HPCC_USER)@$(HPCC_HOST)   "/rhome/xsun042/bigdata/IPRA-exp && tar xvf -"
+	tar cf - ./Makefile ./make ./benchmarks  ./example ./singularity ./push-pop-counter \
+		./install/autofdo ./install/llvm ./install/count-sum ./install/counter \
+		| ssh $(HPCC_USER)@$(HPCC_HOST)  "cd /rhome/xsun042/bigdata/IPRA-exp && tar xvf -"
 
 # scp -pr ./benchmarks $(HPCC_USER)@$(HPCC_HOST):/rhome/xsun042/bigdata/IPRA-exp
 # scp -pr ./singularity $(HPCC_USER)@$(HPCC_HOST):/rhome/xsun042/bigdata/IPRA-exp
@@ -227,10 +236,7 @@ upload-image:
 	scp -pr ./singularity $(HPCC_USER)@$(HPCC_HOST):/rhome/xsun042/bigdata/IPRA-exp
 
 upload-bench:
-	scp -pr ./Makefile ./make ./benchmarks $(HPCC_USER)@$(HPCC_HOST):/rhome/xsun042/bigdata/IPRA-exp
-
-upload-autofdo:
-	scp -pr $(INSTALL_PATH)/autofdo  $(HPCC_USER)@$(HPCC_HOST):/rhome/xsun042/bigdata/IPRA-exp/install
+	tar cf - ./Makefile ./make ./benchmarks | ssh $(HPCC_USER)@$(HPCC_HOST)  "cd /rhome/xsun042/bigdata/IPRA-exp && tar xvf -"
 
 hpcc: upload-bench
 	ssh $(HPCC_USER)@$(HPCC_HOST) "cd /rhome/xsun042/bigdata/IPRA-exp && \
@@ -256,6 +262,7 @@ test/autofdo:
 install/DynamoRIO:
 	cd install && wget https://github.com/DynamoRIO/dynamorio/releases/download/cronbuild-9.0.19328/DynamoRIO-Linux-9.0.19328.tar.gz
 	cd install && tar -xzf DynamoRIO-Linux-9.0.19328.tar.gz
+	touch $@
 
 install/ppcount:
 	mkdir -p build/ppcount

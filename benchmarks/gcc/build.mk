@@ -109,6 +109,22 @@ $(1)$(2).perfdata: $(1)
 	rm -rf $$@ 
 	mv $(BUILD_PATH)/$(BENCHMARK)/$$@ $$@
 
+$(1)$(2).regprof2: $(1)
+	$(call switch_binary,$(1),$(2))
+	$(call run_bench,$(INSTALL_DIR)/bin)
+	$(call copy_to_server,$(1),$(2))
+	cd $(BENCH_DIR) && $(PERF) record -e cycles:u -j any,u -o ../$$@ -- $(TASKSET) bash ./perf_commands.sh
+	$(COPY_BACK) $(PWD)/$$@
+	$(RUN_ON_REMOTE) rm -rf $(PWD)/bench.dir/
+	rm -rf $$@ 
+	mv $(BUILD_PATH)/$(BENCHMARK)/$$@ $$@
+
+$(1)$(2).regprof3: $(1).profbuild
+	$(call switch_binary,$(1),$(2))
+	$(call run_bench,$(INSTALL_DIR)/bin)
+	cd $(BENCH_DIR) &&  $(TASKSET) bash ./perf_commands.sh > $(PWD)/$$@.raw
+	cat $(PWD)/$$@.raw | $(COUNTSUM) > $(PWD)/$$@
+
 endef
 
 define gen_bench

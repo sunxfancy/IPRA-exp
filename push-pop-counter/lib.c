@@ -17,6 +17,7 @@ struct Profile {
 };
 
 struct Profile __LLVM_IRPP = {0, 0, 0, 0};
+__thread uint64_t __LLVM_IRPP_SpillReg = 0;
 __thread uint64_t __LLVM_IRPP_Spill = 0;
 __thread uint64_t __LLVM_IRPP_Reload = 0;
 __thread uint64_t __LLVM_IRPP_Push = 0;
@@ -31,8 +32,10 @@ void __LLVM_IRPP_ProfileDtor(void* arg) {
 }
 
 static void PrintProfile() {
-    printf("spill = %lu bytes; reload = %lu bytes \n", __LLVM_IRPP.Spill, __LLVM_IRPP.Reload);
-    printf("push = %lu pop = %lu \n", __LLVM_IRPP.Push, __LLVM_IRPP.Pop);
+    printf("dynamic spill  (B): %lu\n", __LLVM_IRPP.Spill);
+    printf("dynamic reload (B): %lu\n", __LLVM_IRPP.Reload);
+    printf("dynamic push count: %lu\n", __LLVM_IRPP.Push);
+    printf("dynamic pop  count: %lu\n", __LLVM_IRPP.Pop);
 }
 
 __attribute__ ((constructor)) static void main_thread(void)
