@@ -28,27 +28,24 @@ void __LLVM_IRPP_ProfileDtor(void* arg) {
     __LLVM_IRPP.Reload += __LLVM_IRPP_Reload;
     __LLVM_IRPP.Push += __LLVM_IRPP_Push;
     __LLVM_IRPP.Pop += __LLVM_IRPP_Pop;
-    printf("dtor called\n");
 }
 
 static void PrintProfile() {
-    printf("dynamic spill  (B): %lu\n", __LLVM_IRPP.Spill);
-    printf("dynamic reload (B): %lu\n", __LLVM_IRPP.Reload);
-    printf("dynamic push count: %lu\n", __LLVM_IRPP.Push);
-    printf("dynamic pop  count: %lu\n", __LLVM_IRPP.Pop);
+    const char* path = getenv("LLVM_IRPP_PROFILE"); 
+    if (path == NULL) path = "regprof3.raw";
+    FILE* f = fopen(path, "a");
+    fprintf(f, "dynamic spill  (B): %lu\n", __LLVM_IRPP.Spill);
+    fprintf(f, "dynamic reload (B): %lu\n", __LLVM_IRPP.Reload);
+    fprintf(f, "dynamic push count: %lu\n", __LLVM_IRPP.Push);
+    fprintf(f, "dynamic pop  count: %lu\n", __LLVM_IRPP.Pop);
+    fclose(f);
 }
 
 __attribute__ ((constructor)) static void main_thread(void)
 {
-	printf("register dtor\n");
-    __cxa_thread_atexit_impl(__LLVM_IRPP_ProfileDtor, NULL, __dso_handle);
+    __cxa_thread_atexit_impl(__LLVM_IRPP_ProfileDtor, NULL, &__dso_handle);
     atexit(PrintProfile);
 }
-
-
-extern void *__dso_handle __attribute__ ((__visibility__ ("hidden")));
-extern void __LLVM_IRPP_ProfileDtor(void* arg);
-
 
 struct thread_info {
     void *(*start_routine)(void *);
@@ -60,8 +57,7 @@ static void* my_start_routine(void* i) {
     void *(*start_routine)(void *) = info->start_routine;
     void *arg = info->arg;
     free(info);
-    printf("register dtor\n");
-    __cxa_thread_atexit_impl(__LLVM_IRPP_ProfileDtor, NULL, __dso_handle);
+    __cxa_thread_atexit_impl(__LLVM_IRPP_ProfileDtor, NULL, &__dso_handle);
     return start_routine(arg);
 }
 
@@ -75,7 +71,6 @@ int pthread_create(pthread_t *restrict thread,
         const pthread_attr_t *restrict,
         void *(*)(void *),
         void *restrict) = dlsym(RTLD_NEXT, "pthread_create");
-    printf("pthread_create called\n");
 
     struct thread_info* info = (struct thread_info*)malloc(sizeof(struct thread_info));
     info->start_routine = start_routine;

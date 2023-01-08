@@ -140,7 +140,7 @@ pgo-$(2)-$(1): instrumented.profdata $(PGO_$(call UPCASE,$(2))_HOT_LIST)  | $(SO
 		,$(call GEN_VARS,pgo-$(2)-$(1),$(2)))
 	touch $$@
 
-pgo-$(2)-$(1).profbuild: instrumented.profdata | $(SOURCE)/.complete
+pgo-$(2)-$(1).profbuild: instrumented.profdata $(PGO_$(call UPCASE,$(2))_HOT_LIST) | $(SOURCE)/.complete
 	$(call $(BUILD_ACTION),$$@,\
 		$(call gen_build_flags,$(1),pgo-$(2)-$(1),-mllvm -EnablePushPopProfile -mllvm -EnableSpillBytesProfile,\
 			-Wl$(COMMA)-mllvm -Wl$(COMMA)-EnablePushPopProfile -Wl$(COMMA)-mllvm -Wl$(COMMA)-EnableSpillBytesProfile $(ROOT)/push-pop-counter/lib.o)\

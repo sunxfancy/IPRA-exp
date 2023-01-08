@@ -123,7 +123,8 @@ $(1)$(2).regprof2: $(1)
 $(1)$(2).regprof3: $(1).profbuild
 	$(call switch_binary,$(1).profbuild,$(2))
 	$(call clang_bench,$(INSTALL_DIR)/bin)
-	mkdir -p $(BENCH_DIR) && cd $(BENCH_DIR) && bash ./perf_commands.sh > $(PWD)/$$@.raw
+	mkdir -p $(BENCH_DIR) && cd $(BENCH_DIR) && \
+		LLVM_IRPP_PROFILE="$(PWD)/$$@.raw" bash ./perf_commands.sh 
 	cat $(PWD)/$$@.raw | $(COUNTSUM) > $(PWD)/$$@
 
 endef

@@ -162,7 +162,7 @@ $(BUILD_PATH)/llvm/build.ninja: LLVM-IPRA
 # -DCMAKE_CXX_COMPILER=clang++ \
 
 push-pop-counter/lib.o: push-pop-counter/lib.c
-	gcc -c -O3 push-pop-counter/lib.c -o $(BUILD_PATH)/push-pop-counter/lib.o
+	gcc -c -O3 -fPIC push-pop-counter/lib.c -o push-pop-counter/lib.o
 
 build/UMake: UMake
 	mkdir -p $(BUILD_PATH)/UMake

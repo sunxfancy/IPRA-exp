@@ -18,7 +18,7 @@ define switch_binary
 	if [ ! -d "$(INSTALL_DIR)/bin" ]; then \
 		mkdir -p $(BUILD_PATH)/$(BENCHMARK) && cp -r $(PWD)/install.dir $(BUILD_PATH)/$(BENCHMARK)/; fi
 	rm -f $(INSTALL_DIR)/libexec/gcc/x86_64-linux-gnu/$(GCC_VERSION)/cc1
-	ln -s $(PWD)/$(1)/$(MAIN_BIN)$(2) $(INSTALL_DIR)/libexec/gcc/x86_64-linux-gnu/$(GCC_VERSION)/cc1
+	cp $(PWD)/$(1)/$(MAIN_BIN)$(2) $(INSTALL_DIR)/libexec/gcc/x86_64-linux-gnu/$(GCC_VERSION)/cc1
 endef
 
 define build_gcc
@@ -38,6 +38,8 @@ define build_gcc
 		--enable-checking=release \
 		--enable-languages=c \
 		--disable-multilib \
+		--disable-shared \
+		--disable-lto \
 		--disable-intermodule \
 		--disable-bootstrap \
 		--disable-coverage \
@@ -120,9 +122,11 @@ $(1)$(2).regprof2: $(1)
 	mv $(BUILD_PATH)/$(BENCHMARK)/$$@ $$@
 
 $(1)$(2).regprof3: $(1).profbuild
-	$(call switch_binary,$(1),$(2))
+	$(call switch_binary,$(1).profbuild,$(2))
 	$(call run_bench,$(INSTALL_DIR)/bin)
-	cd $(BENCH_DIR) &&  $(TASKSET) bash ./perf_commands.sh > $(PWD)/$$@.raw
+	cd $(BENCH_DIR) && \
+		LLVM_IRPP_PROFILE="$(PWD)/$$@.raw" \
+		$(TASKSET) bash ./perf_commands.sh
 	cat $(PWD)/$$@.raw | $(COUNTSUM) > $(PWD)/$$@
 
 endef
@@ -166,9 +170,9 @@ instrumented.profdata:  instrumented
 $(GCC_NAME).zip:
 	wget https://github.com/gcc-mirror/gcc/archive/refs/tags/releases/$(GCC_NAME).zip
 
-$(SOURCE)/.complete: $(GCC_NAME).zip
+$(SOURCE)/.complete: $(GCC_NAME).zip 
 	mkdir -p $(BUILD_PATH)/$(BENCHMARK)
-	cd $(BUILD_PATH)/$(BENCHMARK) && unzip -q -o $(PWD)/$<
+	cd $(BUILD_PATH)/$(BENCHMARK) && unzip -q -o $(PWD)/$< 
 	cd $(BUILD_PATH)/$(BENCHMARK)/gcc-releases-$(GCC_NAME) && \
 	   contrib/download_prerequisites \
 	&& find . -type f -name configure -exec sed -i 's/\$$CC -print-multi-os-directory/gcc -print-multi-os-directory/g' {} \; \
