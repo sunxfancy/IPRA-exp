@@ -27,6 +27,7 @@ From: ubuntu:22.04
     ln -s /usr/lib/llvm-14/lib/python3.10/dist-packages/lldb/* /usr/lib/local/lib/python3.10/dist-packages/lldb/
     wget https://github.com/snare/voltron/archive/refs/heads/master.zip -O voltron.zip && unzip voltron.zip
 	cd voltron-master && ./install.sh -s
+    pip3 install jupyter matplotlib 
 
 %environment
     export LC_ALL=C

@@ -15,3 +15,4 @@
 /tmp/
 compile_commands.json
 *.sif
+.ipynb_checkpoints/

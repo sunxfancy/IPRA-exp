@@ -269,6 +269,9 @@ install/ppcount:
 	cd build/ppcount && cmake -DDynamoRIO_DIR=$(INSTALL_PATH)/DynamoRIO-Linux-9.0.19328/cmake -G Ninja ../../push-pop-counter
 	cd build/ppcount && ninja
 
+jupyter:
+	jupyter notebook
+
 clean:
 	rm -rf $(OUTPUT_PATH) $(BUILD_PATH)
 
