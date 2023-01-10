@@ -138,9 +138,9 @@ $(1)$(2).bench: $(1)
 	$(call switch_binary,$(1),$(2))
 	cp -f $(mkfile_path)loadtest-funcs.sh ./loadtest-funcs.sh
 	$(call copy_to_server,$(1),$(2))
-	$(RUN) ./loadtest-funcs.sh setup_mysql $(1) 2>&1
+	$(RUN) $(mkfile_path)loadtest-funcs.sh setup_mysql $(1) 2>&1
 	cd $(BUILD_PATH)/$(BENCHMARK) && \
-	$(RUN) ./loadtest-funcs.sh run_sysbench_benchmark $(1)$(2) 5 
+	$(RUN) $(mkfile_path)loadtest-funcs.sh run_sysbench_benchmark $(1)$(2) 5 
 	$(RUN_FOR_REMOTE) mkdir -p $(BENCH_DIR)/
 	$(COPY_BACK) $(BENCH_DIR)/$(1)$(2)
 	$(RUN_ON_REMOTE) rm -rf $(PWD)/
