@@ -1,5 +1,5 @@
 
-benchmarks: benchmarks/clang/regprof benchmarks/mysql/regprof benchmarks/gcc/regprof
+benchmarks: benchmarks/gcc/regprof3 benchmarks/clang/regprof3 benchmarks/mysql/regprof3 benchmarks/leveldb/regprof3 benchmarks/gcc/bench benchmarks/clang/bench benchmarks/mysql/bench benchmarks/leveldb/bench 
 	
 # make benchmarks/SPEC/bench
 
