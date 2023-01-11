@@ -226,7 +226,7 @@ function sysbench_compare() {
 }
 
 function run_perf() {
-  /usr/lib/linux-tools/5.15.0-56-generic/perf record -e cycles:u -j any "$@"
+  ${PERF_PATH} record -e cycles:u -j any "$@"
 }
 
 "$@"

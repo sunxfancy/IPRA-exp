@@ -145,8 +145,8 @@ $(1)$(2).bench: $(1)
 	
 endef 
 
-additional_compiler_flags = $(if $(find thin,$(1)),-flto=thin,)  $(if $(find full,$(1)),-flto=full,) -fprofile-use=$(PWD)/instrumented.profdata
-additional_linker_flags = $(if $(find thin,$(1)),-flto=thin,)  $(if $(find full,$(1)),-flto=full,) -fprofile-use=$(PWD)/instrumented.profdata
+additional_compiler_flags = $(if $(findstring thin,$(1)),-flto=thin)  $(if $(findstring full,$(1)),-flto=full) -fprofile-use=$(PWD)/instrumented.profdata
+additional_linker_flags = $(if $(findstring thin,$(1)),-flto=thin)  $(if $(findstring full,$(1)),-flto=full) -fprofile-use=$(PWD)/instrumented.profdata
 
 $(eval $(call gen_pgo_targets,thin))
 $(eval $(call gen_pgo_targets,full))
