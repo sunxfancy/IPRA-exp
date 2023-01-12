@@ -12,9 +12,10 @@ common_compiler_flags +=  -fPIC -DNDEBUG \
 MAIN_BIN = db_bench
 BUILD_ACTION=build_leveldb
 BUILD_TARGET=db_bench
-
+INSTALL_TARGET=db_bench
 
 define build_leveldb
+	if [ -d "$(PWD)/$(1)" ]; then rm -rf $(PWD)/$(1); fi
 	mkdir -p $(BUILD_DIR)/$(1)
 	mkdir -p $(PWD)/$(1)
 	rm -f $(PWD)/$(1).count-push-pop 
@@ -39,21 +40,21 @@ endef
 
 define gen_perfdata
 
-$(1)$(2).perfdata: $(1) 
+$(1)$(2).perfdata: $(1)/.complete
 	mkdir -p $(BENCH_DIR) && cd $(BENCH_DIR) && \
 		$(PERF) record -e cycles:u -j any,u -o ../$$@ -- $(TASKSET) $(PWD)/$(1)/$(MAIN_BIN)$(2)
 	rm -rf /tmp/leveldbtest-*
 	rm -rf $$@ 
 	mv $(BUILD_PATH)/$(BENCHMARK)/$$@ $$@
 
-$(1)$(2).regprof2: $(1)
+$(1)$(2).regprof2: $(1)/.complete
 	mkdir -p $(BENCH_DIR) && cd $(BENCH_DIR) && \
 		$(PERF) record -e cycles:u -j any,u -o ../$$@ -- $(TASKSET) $(PWD)/$(1)/$(MAIN_BIN)$(2)
 	rm -rf /tmp/leveldbtest-*
 	rm -rf $$@ 
 	mv $(BUILD_PATH)/$(BENCHMARK)/$$@ $$@
 
-$(1)$(2).regprof3: $(1).profbuild
+$(1)$(2).regprof3: $(1).profbuild/.complete
 	mkdir -p $(BENCH_DIR) && cd $(BENCH_DIR) && \
 		LLVM_IRPP_PROFILE="$(PWD)/$$@.raw" $(PWD)/$(1).profbuild/$(MAIN_BIN)$(2)
 	rm -rf /tmp/leveldbtest-*
@@ -63,7 +64,7 @@ endef
 
 define gen_bench
 
-$(1)$(2).bench: $(1)
+$(1)$(2).bench: $(1)/.complete
 	mkdir -p $(BENCH_DIR) && cd $(BENCH_DIR) && \
 		$(PERF) stat $(PERF_EVENTS) -o ../$$@ -r5 -- $(TASKSET) $(PWD)/$(1)/$(MAIN_BIN)$(2)
 	rm -rf /tmp/leveldbtest-*
@@ -82,11 +83,12 @@ $(eval $(call gen_pgo_targets,full))
 debug-makefile:
 	$(warning $(call gen_pgo_targets,full))
 
-instrumented: | $(SOURCE)/.complete
-	$(call build_leveldb,$@,$(call gen_build_flags_ins,,-fprofile-generate=$(INSTRUMENTED_PROF),-fprofile-generate=$(INSTRUMENTED_PROF)),install)
+instrumented: instrumented/.complete
+instrumented/.complete: | $(SOURCE)/.complete
+	$(call build_leveldb,instrumented,$(call gen_build_flags_ins,,-fprofile-generate=$(INSTRUMENTED_PROF),-fprofile-generate=$(INSTRUMENTED_PROF)),$(INSTALL_TARGET))
 	touch $@
 
-instrumented.profdata: instrumented
+instrumented.profdata: instrumented/.complete
 	rm -rf $(INSTRUMENTED_PROF)
 	mkdir -p $(BENCH_DIR)
 	cd $(BENCH_DIR) && $(PWD)/instrumented/$(MAIN_BIN)

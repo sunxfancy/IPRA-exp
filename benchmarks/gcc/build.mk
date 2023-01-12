@@ -13,6 +13,7 @@ COMMA := ,
 MAIN_BIN = gcc/cc1
 BUILD_ACTION=build_gcc
 BUILD_TARGET=all-gcc
+INSTALL_TARGET=install-gcc
 
 define switch_binary
 	if [ ! -d "$(INSTALL_DIR)/bin" ]; then \
@@ -22,6 +23,7 @@ define switch_binary
 endef
 
 define build_gcc
+	if [ -d "$(PWD)/$(1)" ]; then rm -rf $(PWD)/$(1); fi
 	mkdir -p $(BUILD_DIR)/$(1)
 	mkdir -p $(PWD)/$(1)/$(BENCHMARK)
 	mkdir -p $(INSTALL_DIR)
@@ -56,7 +58,7 @@ define build_gcc
 		time -o $(PWD)/$(1)/time.log make $(3) -j $(shell nproc) > $(PWD)/$(1)/build.log \
 		|| { echo "*** build failed ***"; exit 1 ; }
 	if [ ! -d "$(PWD)/install.dir" ]; then \
-		mkdir -p $(INSTALL_DIR) && cd $(BUILD_DIR)/$(1) && make install-gcc >> $(PWD)/$(1)/build.log; \
+		mkdir -p $(INSTALL_DIR) && cd $(BUILD_DIR)/$(1) && make $(INSTALL_TARGET) >> $(PWD)/$(1)/build.log; \
 		if [ "$(1)" != "instrumented" ]; then \
 			mv $(INSTALL_DIR) $(PWD)/install.dir; \
 		fi; \
@@ -101,7 +103,7 @@ endef
 
 define gen_perfdata
 
-$(1)$(2).perfdata: $(1) 
+$(1)$(2).perfdata: $(1)/.complete
 	$(call switch_binary,$(1),$(2))
 	$(call run_bench,$(INSTALL_DIR)/bin)
 	$(call copy_to_server,$(1),$(2))
@@ -111,7 +113,7 @@ $(1)$(2).perfdata: $(1)
 	rm -rf $$@ 
 	mv $(BUILD_PATH)/$(BENCHMARK)/$$@ $$@
 
-$(1)$(2).regprof2: $(1)
+$(1)$(2).regprof2: $(1)/.complete
 	$(call switch_binary,$(1),$(2))
 	$(call run_bench,$(INSTALL_DIR)/bin)
 	$(call copy_to_server,$(1),$(2))
@@ -121,7 +123,7 @@ $(1)$(2).regprof2: $(1)
 	rm -rf $$@ 
 	mv $(BUILD_PATH)/$(BENCHMARK)/$$@ $$@
 
-$(1)$(2).regprof3: $(1).profbuild
+$(1)$(2).regprof3: $(1).profbuild/.complete
 	$(call switch_binary,$(1).profbuild,$(2))
 	$(call run_bench,$(INSTALL_DIR)/bin)
 	cd $(BENCH_DIR) && \
@@ -133,7 +135,7 @@ endef
 
 define gen_bench
 
-$(1)$(2).bench: $(1)
+$(1)$(2).bench: $(1)/.complete
 	$(call switch_binary,$(1),$(2))
 	$(call run_bench,$(INSTALL_DIR)/bin)
 	$(call copy_to_server,$(1),$(2))
@@ -147,6 +149,7 @@ endef
 
 additional_compiler_flags = $(if $(findstring thin,$(1)),-flto=thin)  $(if $(findstring full,$(1)),-flto=full) -fprofile-use=$(PWD)/instrumented.profdata
 additional_linker_flags = $(if $(findstring thin,$(1)),-flto=thin)  $(if $(findstring full,$(1)),-flto=full) -fprofile-use=$(PWD)/instrumented.profdata
+additional_original_flags = $(if $(findstring thin,$(1)),AR=$(LLVM_AR) RANLIB=$(LLVM_RANLIB)) $(if $(findstring full,$(1)),AR=$(LLVM_AR) RANLIB=$(LLVM_RANLIB)) 
 
 $(eval $(call gen_pgo_targets,thin))
 $(eval $(call gen_pgo_targets,full))
@@ -155,11 +158,13 @@ $(eval $(call gen_pgo_targets,full))
 debug-makefile:
 	$(warning $(call gen_pgo_targets,full))
 
-instrumented: | $(SOURCE)/.complete
+instrumented: instrumented/.complete
+instrumented/.complete: | $(SOURCE)/.complete
 	mkdir -p $(INSTRUMENTED_PROF)
-	$(call build_gcc,$@,$(call gen_build_flags_ins,,-fprofile-generate=$(INSTRUMENTED_PROF),-fprofile-generate=$(INSTRUMENTED_PROF)),$(BUILD_TARGET))
+	$(call build_gcc,instrumented,$(call gen_build_flags_ins,,-fprofile-generate=$(INSTRUMENTED_PROF),-fprofile-generate=$(INSTRUMENTED_PROF)),$(BUILD_TARGET))
+	touch $@
 
-instrumented.profdata:  instrumented
+instrumented.profdata:  instrumented/.complete
 	rm -rf $(INSTRUMENTED_PROF) && mkdir -p $(INSTRUMENTED_PROF)
 	$(call switch_binary,instrumented)
 	$(call run_bench,$(INSTALL_DIR)/bin)

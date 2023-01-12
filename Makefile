@@ -12,6 +12,8 @@ LLVM_ROOT_PATH = $(PWD)/install/llvm
 
 NCC = $(PWD)/install/llvm/bin/clang_proxy
 NCXX = $(PWD)/install/llvm/bin/clang_proxy++
+LLVM_AR = $(PWD)/install/llvm/bin/llvm-ar
+LLVM_RANLIB = $(PWD)/install/llvm/bin/llvm-ranlib
 
 PERF_EVENTS:= -e instructions,cycles,L1-icache-misses,iTLB-misses,L1-dcache-loads,L1-dcache-load-misses,dTLB-load-misses,L1-dcache-stores,L1-dcache-store-misses,dTLB-store-misses,branches,branch-misses,page-faults,context-switches,cpu-migrations
 

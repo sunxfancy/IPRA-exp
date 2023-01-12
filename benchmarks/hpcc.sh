@@ -11,6 +11,12 @@ function run() {
         bash benchmarks/hpcc-$1.sh pgo-full-bfdoipra2 $2
         bash benchmarks/hpcc-$1.sh pgo-full-bfdoipra3 $2
         bash benchmarks/hpcc-$1.sh pgo-full-ipra $2
+        bash benchmarks/hpcc-$1.sh pgo-full-fdoipra $2
+        bash benchmarks/hpcc-$1.sh pgo-full-fdoipra2 $2
+        bash benchmarks/hpcc-$1.sh pgo-full-fdoipra3 $2
+        bash benchmarks/hpcc-$1.sh pgo-full-bfdoipra $2
+        bash benchmarks/hpcc-$1.sh pgo-full-bfdoipra2 $2
+        bash benchmarks/hpcc-$1.sh pgo-full-bfdoipra3 $2
     else 
         sbatch benchmarks/hpcc-$1.sh pgo-full $2
         sbatch benchmarks/hpcc-$1.sh pgo-full-fdoipra $2
@@ -20,6 +26,12 @@ function run() {
         sbatch benchmarks/hpcc-$1.sh pgo-full-bfdoipra2 $2
         sbatch benchmarks/hpcc-$1.sh pgo-full-bfdoipra3 $2
         sbatch benchmarks/hpcc-$1.sh pgo-full-ipra $2
+        sbatch benchmarks/hpcc-$1.sh pgo-full-fdoipra4 $2
+        sbatch benchmarks/hpcc-$1.sh pgo-full-fdoipra5 $2
+        sbatch benchmarks/hpcc-$1.sh pgo-full-fdoipra6 $2
+        sbatch benchmarks/hpcc-$1.sh pgo-full-bfdoipra4 $2
+        sbatch benchmarks/hpcc-$1.sh pgo-full-bfdoipra5 $2
+        sbatch benchmarks/hpcc-$1.sh pgo-full-bfdoipra6 $2
     fi
 }
 

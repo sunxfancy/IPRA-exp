@@ -17,19 +17,23 @@ echo $SLURM_PROCID-$SLURM_JOBID
 echo Build mysql: $1
 echo Action: $2
 
-rm -rf /scratch/mysql/
-singularity exec singularity/image.sif make BUILD_PATH=/scratch benchmarks/mysql/$1
+rm -rf /scratch/$SLURM_JOBID
+mkdir -p /scratch/$SLURM_JOBID
+
+singularity exec singularity/image.sif make BUILD_PATH=/scratch/$SLURM_JOBID benchmarks/mysql/$1
 
 if [[ "$2" != "" ]]; then
-    singularity exec singularity/image.sif make BUILD_PATH=/scratch benchmarks/mysql/$1.$2
+    singularity exec singularity/image.sif make BUILD_PATH=/scratch/$SLURM_JOBID benchmarks/mysql/$1.$2
     if [[ "$1" == *"fdoipra"* ]]; then
-        singularity exec singularity/image.sif make BUILD_PATH=/scratch benchmarks/mysql/$1.1-10.$2
-        singularity exec singularity/image.sif make BUILD_PATH=/scratch benchmarks/mysql/$1.1-20.$2
-        singularity exec singularity/image.sif make BUILD_PATH=/scratch benchmarks/mysql/$1.3-10.$2
-        singularity exec singularity/image.sif make BUILD_PATH=/scratch benchmarks/mysql/$1.3-20.$2
-        singularity exec singularity/image.sif make BUILD_PATH=/scratch benchmarks/mysql/$1.5-10.$2
-        singularity exec singularity/image.sif make BUILD_PATH=/scratch benchmarks/mysql/$1.5-20.$2
-        singularity exec singularity/image.sif make BUILD_PATH=/scratch benchmarks/mysql/$1.10-10.$2
-        singularity exec singularity/image.sif make BUILD_PATH=/scratch benchmarks/mysql/$1.10-20.$2
+        singularity exec singularity/image.sif make BUILD_PATH=/scratch/$SLURM_JOBID benchmarks/mysql/$1.1-10.$2
+        singularity exec singularity/image.sif make BUILD_PATH=/scratch/$SLURM_JOBID benchmarks/mysql/$1.1-20.$2
+        singularity exec singularity/image.sif make BUILD_PATH=/scratch/$SLURM_JOBID benchmarks/mysql/$1.3-10.$2
+        singularity exec singularity/image.sif make BUILD_PATH=/scratch/$SLURM_JOBID benchmarks/mysql/$1.3-20.$2
+        singularity exec singularity/image.sif make BUILD_PATH=/scratch/$SLURM_JOBID benchmarks/mysql/$1.5-10.$2
+        singularity exec singularity/image.sif make BUILD_PATH=/scratch/$SLURM_JOBID benchmarks/mysql/$1.5-20.$2
+        singularity exec singularity/image.sif make BUILD_PATH=/scratch/$SLURM_JOBID benchmarks/mysql/$1.10-10.$2
+        singularity exec singularity/image.sif make BUILD_PATH=/scratch/$SLURM_JOBID benchmarks/mysql/$1.10-20.$2
     fi
 fi
+
+rm -rf /scratch/$SLURM_JOBID

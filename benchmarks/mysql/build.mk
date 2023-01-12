@@ -24,6 +24,7 @@ common_compiler_flags += -DDBUG_OFF -DBOOST_NO_CXX98_FUNCTION_BASE -O3 -DNDEBUG 
 MAIN_BIN = bin/mysqld
 BUILD_ACTION=build_mysql
 BUILD_TARGET=mysqld
+INSTALL_TARGET=install
 
 define switch_binary
 	if [ ! -d "$(INSTALL_DIR)/bin" ]; then \
@@ -33,6 +34,7 @@ define switch_binary
 endef
 
 define build_mysql
+	if [ -d "$(PWD)/$(1)" ]; then rm -rf $(PWD)/$(1); fi
 	mkdir -p $(BUILD_DIR)/$(1)
 	mkdir -p $(PWD)/$(1)/bin
 	mkdir -p $(INSTALL_DIR)
@@ -60,7 +62,7 @@ define build_mysql
 		time -o $(PWD)/$(1)/time.log ninja $(3) -j $(shell nproc) -v > $(PWD)/$(1)/build.log \
 		|| { echo "*** build failed ***"; exit 1 ; }
 	if [ ! -d "$(PWD)/install.dir" ]; then \
-		mkdir -p $(INSTALL_DIR) && cd $(BUILD_DIR)/$(1) && ninja install -v >> $(PWD)/$(1)/build.log; \
+		mkdir -p $(INSTALL_DIR) && cd $(BUILD_DIR)/$(1) && ninja $(INSTALL_TARGET) -v >> $(PWD)/$(1)/build.log; \
 		if [ "$(1)" != "instrumented" ]; then \
 			mv $(INSTALL_DIR) $(PWD)/install.dir; \
 		fi; \
@@ -89,7 +91,7 @@ endef
 
 define gen_perfdata
 
-$(1)$(2).perfdata: $(1) 
+$(1)$(2).perfdata: $(1)/.complete
 	$(call switch_binary,$(1),$(2))
 	cp -f $(mkfile_path)loadtest-funcs.sh ./loadtest-funcs.sh
 	$(call copy_to_server,$(1),$(2))
@@ -104,7 +106,7 @@ $(1)$(2).perfdata: $(1)
 	rm -rf $$@ 
 	mv $(BUILD_PATH)/$(BENCHMARK)/$$@ $$@
 
-$(1)$(2).regprof2: $(1)
+$(1)$(2).regprof2: $(1)/.complete
 	$(call switch_binary,$(1),$(2))
 	cp -f $(mkfile_path)loadtest-funcs.sh ./loadtest-funcs.sh
 	$(call copy_to_server,$(1),$(2))
@@ -119,7 +121,7 @@ $(1)$(2).regprof2: $(1)
 	rm -rf $$@ 
 	mv $(BUILD_PATH)/$(BENCHMARK)/$$@ $$@
 	
-$(1)$(2).regprof3: $(1).profbuild
+$(1)$(2).regprof3: $(1).profbuild/.complete
 	$(call switch_binary,$(1).profbuild,$(2))
 	cp -f $(mkfile_path)loadtest-funcs.sh ./loadtest-funcs.sh
 	cd $(BUILD_PATH)/$(BENCHMARK) && \
@@ -134,7 +136,7 @@ endef
 
 define gen_bench
 
-$(1)$(2).bench: $(1)
+$(1)$(2).bench: $(1)/.complete
 	$(call switch_binary,$(1),$(2))
 	cp -f $(mkfile_path)loadtest-funcs.sh ./loadtest-funcs.sh
 	$(call copy_to_server,$(1),$(2))
@@ -159,11 +161,12 @@ $(eval $(call gen_pgo_targets,full))
 debug-makefile:
 	$(warning $(call gen_pgo_targets,full))
 
-instrumented: | $(SOURCE)/.complete
-	$(call build_mysql,$@,$(call gen_build_flags_ins) -DFPROFILE_GENERATE=1 -DFPROFILE_DIR="$(INSTRUMENTED_PROF)/%4m.profraw",install)
+instrumented: instrumented/.complete
+instrumented/.complete: | $(SOURCE)/.complete
+	$(call build_mysql,instrumented,$(call gen_build_flags_ins) -DFPROFILE_GENERATE=1 -DFPROFILE_DIR="$(INSTRUMENTED_PROF)/%4m.profraw",$(INSTALL_TARGET))
 	touch $@
 
-instrumented.profdata: instrumented
+instrumented.profdata: instrumented/.complete
 	rm -rf $(INSTRUMENTED_PROF)
 	$(call switch_binary,instrumented)
 	cd $(BUILD_PATH)/$(BENCHMARK) && \

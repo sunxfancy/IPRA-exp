@@ -89,7 +89,7 @@ $(2)$(3).regcompare: $(1).perfdata $(2)$(3).perfdata $(2)$(3).ncsr
 		--namelist="$(PWD)/$(2)$(3).ncsr" \
 		--not_in_list
 
-$(2)$(3).ncsr: $(2)
+$(2)$(3).ncsr: $(2)/.complete
 	sed -n 's/\* \([^ ]*\).*/\1/gp' $(PWD)/$(2)$(3).psi > $(PWD)/$(2)$(3).ncsr
 
 endef
@@ -133,17 +133,18 @@ endef
 
  #(fdoname, lto)
 define gen_pgo_target
-
-pgo-$(2)-$(1): instrumented.profdata $(PGO_$(call UPCASE,$(2))_HOT_LIST)  | $(SOURCE)/.complete
-	$(call $(BUILD_ACTION),$$@,\
+pgo-$(2)-$(1): pgo-$(2)-$(1)/.complete
+pgo-$(2)-$(1)/.complete: instrumented.profdata $(PGO_$(call UPCASE,$(2))_HOT_LIST)  | $(SOURCE)/.complete
+	$(call $(BUILD_ACTION),pgo-$(2)-$(1),\
 		$(call gen_build_flags,$(1),pgo-$(2)-$(1))\
 		,$$(BUILD_TARGET)\
 		,$(call GEN_ARGS,pgo-$(2)-$(1))\
 		,$(call GEN_VARS,pgo-$(2)-$(1),$(2)))
 	touch $$@
 
-pgo-$(2)-$(1).profbuild: instrumented.profdata $(PGO_$(call UPCASE,$(2))_HOT_LIST) | $(SOURCE)/.complete
-	$(call $(BUILD_ACTION),$$@,\
+pgo-$(2)-$(1).profbuild: pgo-$(2)-$(1).profbuild/.complete
+pgo-$(2)-$(1).profbuild/.complete: instrumented.profdata $(PGO_$(call UPCASE,$(2))_HOT_LIST) | $(SOURCE)/.complete
+	$(call $(BUILD_ACTION),pgo-$(2)-$(1).profbuild,\
 		$(call gen_build_flags,$(1),pgo-$(2)-$(1),-mllvm -EnablePushPopProfile -mllvm -EnableSpillBytesProfile,\
 			-Wl$(COMMA)-mllvm -Wl$(COMMA)-EnablePushPopProfile -Wl$(COMMA)-mllvm -Wl$(COMMA)-EnableSpillBytesProfile $(ROOT)/push-pop-counter/lib.o)\
 		,$$(BUILD_TARGET)\
@@ -161,30 +162,34 @@ endef
  #(lto)
 define gen_pgo_targets
 
-pgo-$(1): instrumented.profdata | $(SOURCE)/.complete
-	$(call $(BUILD_ACTION),$$@,\
+pgo-$(1): pgo-$(1)/.complete
+pgo-$(1)/.complete: instrumented.profdata | $(SOURCE)/.complete
+	$(call $(BUILD_ACTION),pgo-$(1),\
 		$(call gen_build_flags,,pgo-$(1))\
-		,$$(BUILD_TARGET)\
+		,$$(INSTALL_TARGET)\
 		,$(call GEN_ARGS,pgo-$(1)))
 	touch $$@
 
-pgo-$(1)-ipra: instrumented.profdata | $(SOURCE)/.complete
-	$(call $(BUILD_ACTION),$$@,\
+pgo-$(1)-ipra: pgo-$(1)-ipra/.complete
+pgo-$(1)-ipra/.complete: instrumented.profdata | $(SOURCE)/.complete
+	$(call $(BUILD_ACTION),pgo-$(1)-ipra,\
 		$(call gen_build_flags,ipra,pgo-$(1)-ipra)\
 		,$$(BUILD_TARGET)\
 		,$(call GEN_ARGS,pgo-$(1)-ipra))
 	touch $$@
 
-pgo-$(1).profbuild: instrumented.profdata | $(SOURCE)/.complete
-	$(call $(BUILD_ACTION),$$@,\
+pgo-$(1).profbuild: pgo-$(1).profbuild/.complete
+pgo-$(1).profbuild/.complete: instrumented.profdata | $(SOURCE)/.complete
+	$(call $(BUILD_ACTION),pgo-$(1).profbuild,\
 		$(call gen_build_flags,,pgo-$(1),-mllvm -EnablePushPopProfile -mllvm -EnableSpillBytesProfile,\
 			-Wl$(COMMA)-mllvm -Wl$(COMMA)-EnablePushPopProfile -Wl$(COMMA)-mllvm -Wl$(COMMA)-EnableSpillBytesProfile $(ROOT)/push-pop-counter/lib.o)\
 		,$$(BUILD_TARGET)\
 		,$(call GEN_ARGS,pgo-$(1)))
 	touch $$@
 
-pgo-$(1)-ipra.profbuild: instrumented.profdata | $(SOURCE)/.complete
-	$(call $(BUILD_ACTION),$$@,\
+pgo-$(1)-ipra.profbuild: pgo-$(1)-ipra.profbuild/.complete
+pgo-$(1)-ipra.profbuild/.complete: instrumented.profdata | $(SOURCE)/.complete
+	$(call $(BUILD_ACTION),pgo-$(1)-ipra.profbuild,\
 		$(call gen_build_flags,ipra,pgo-$(1)-ipra,-mllvm -EnablePushPopProfile -mllvm -EnableSpillBytesProfile,\
 			-Wl$(COMMA)-mllvm -Wl$(COMMA)-EnablePushPopProfile -Wl$(COMMA)-mllvm -Wl$(COMMA)-EnableSpillBytesProfile  $(ROOT)/push-pop-counter/lib.o)\
 		,$$(BUILD_TARGET)\
