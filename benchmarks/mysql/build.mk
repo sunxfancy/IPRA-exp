@@ -126,6 +126,7 @@ $(1)$(2).regprof3: $(1).profbuild/.complete
 	cp -f $(mkfile_path)loadtest-funcs.sh ./loadtest-funcs.sh
 	cd $(BUILD_PATH)/$(BENCHMARK) && \
 		$(RUN) $(mkfile_path)loadtest-funcs.sh setup_mysql $(1) 2>&1
+	rm -rf $(PWD)/$$@.raw
 	cd $(BUILD_PATH)/$(BENCHMARK) && \
 		LLVM_IRPP_PROFILE="$(PWD)/$$@.raw" \
 		bash "$(mkfile_path)loadtest-funcs.sh" run_sysbench_loadtest "$(1)$(2)" \

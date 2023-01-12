@@ -126,6 +126,7 @@ $(1)$(2).regprof2: $(1)/.complete
 $(1)$(2).regprof3: $(1).profbuild/.complete
 	$(call switch_binary,$(1).profbuild,$(2))
 	$(call run_bench,$(INSTALL_DIR)/bin)
+	rm -rf $(PWD)/$$@.raw
 	cd $(BENCH_DIR) && \
 		LLVM_IRPP_PROFILE="$(PWD)/$$@.raw" \
 		$(TASKSET) bash ./perf_commands.sh

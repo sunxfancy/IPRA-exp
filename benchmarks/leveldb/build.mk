@@ -42,22 +42,23 @@ define gen_perfdata
 
 $(1)$(2).perfdata: $(1)/.complete
 	mkdir -p $(BENCH_DIR) && cd $(BENCH_DIR) && \
-		$(PERF) record -e cycles:u -j any,u -o ../$$@ -- $(TASKSET) $(PWD)/$(1)/$(MAIN_BIN)$(2)
-	rm -rf /tmp/leveldbtest-*
+		$(PERF) record -e cycles:u -j any,u -o ../$$@ -- $(TASKSET) $(PWD)/$(1)/$(MAIN_BIN)$(2) --db=$(BENCH_DIR)
+	rm -rf $(BENCH_DIR) 
 	rm -rf $$@ 
 	mv $(BUILD_PATH)/$(BENCHMARK)/$$@ $$@
 
 $(1)$(2).regprof2: $(1)/.complete
 	mkdir -p $(BENCH_DIR) && cd $(BENCH_DIR) && \
-		$(PERF) record -e cycles:u -j any,u -o ../$$@ -- $(TASKSET) $(PWD)/$(1)/$(MAIN_BIN)$(2)
-	rm -rf /tmp/leveldbtest-*
+		$(PERF) record -e cycles:u -j any,u -o ../$$@ -- $(TASKSET) $(PWD)/$(1)/$(MAIN_BIN)$(2) --db=$(BENCH_DIR)
+	rm -rf $(BENCH_DIR) 
 	rm -rf $$@ 
 	mv $(BUILD_PATH)/$(BENCHMARK)/$$@ $$@
 
 $(1)$(2).regprof3: $(1).profbuild/.complete
+	rm -rf $(PWD)/$$@.raw
 	mkdir -p $(BENCH_DIR) && cd $(BENCH_DIR) && \
-		LLVM_IRPP_PROFILE="$(PWD)/$$@.raw" $(PWD)/$(1).profbuild/$(MAIN_BIN)$(2)
-	rm -rf /tmp/leveldbtest-*
+		LLVM_IRPP_PROFILE="$(PWD)/$$@.raw" $(PWD)/$(1).profbuild/$(MAIN_BIN)$(2) --db=$(BENCH_DIR)
+	rm -rf $(BENCH_DIR) 
 	cat $(PWD)/$$@.raw | $(COUNTSUM) > $(PWD)/$$@
 
 endef
@@ -66,8 +67,8 @@ define gen_bench
 
 $(1)$(2).bench: $(1)/.complete
 	mkdir -p $(BENCH_DIR) && cd $(BENCH_DIR) && \
-		$(PERF) stat $(PERF_EVENTS) -o ../$$@ -r5 -- $(TASKSET) $(PWD)/$(1)/$(MAIN_BIN)$(2)
-	rm -rf /tmp/leveldbtest-*
+		$(PERF) stat $(PERF_EVENTS) -o ../$$@ -r5 -- $(TASKSET) $(PWD)/$(1)/$(MAIN_BIN)$(2) --db=$(BENCH_DIR)
+	rm -rf $(BENCH_DIR) 
 	rm -rf $$@
 	mv $(BUILD_PATH)/$(BENCHMARK)/$$@ $$@
 
@@ -91,9 +92,9 @@ instrumented/.complete: | $(SOURCE)/.complete
 instrumented.profdata: instrumented/.complete
 	rm -rf $(INSTRUMENTED_PROF)
 	mkdir -p $(BENCH_DIR)
-	cd $(BENCH_DIR) && $(PWD)/instrumented/$(MAIN_BIN)
+	cd $(BENCH_DIR) && $(PWD)/instrumented/$(MAIN_BIN) --db=$(BENCH_DIR)
 	cd $(INSTRUMENTED_PROF) && $(LLVM_BIN)/llvm-profdata merge -output=$(PWD)/instrumented.profdata * && rm *.profraw
-	rm -rf /tmp/leveldbtest-*
+	rm -rf $(BENCH_DIR) 
 
 
 $(LEVELDB_VERSION).zip: 
