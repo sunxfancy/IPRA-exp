@@ -131,7 +131,7 @@ build/autofdo: autofdo install/llvm
 
 install/mold:
 	cd $(INSTALL_PATH)/ && wget https://github.com/rui314/mold/releases/download/v1.8.0/mold-1.8.0-x86_64-linux.tar.gz
-	cd $(INSTALL_PATH)/ && tar -xvf mold-1.8.0-x86_64-linux.tar.gz
+	cd $(INSTALL_PATH)/ && tar -xvf mold-1.8.0-x86_64-linux.tar.gz && rm mold-1.8.0-x86_64-linux.tar.gz
 	touch $@
 
 llvm: $(BUILD_PATH)/llvm/build.ninja install/mold
@@ -263,7 +263,7 @@ test/autofdo:
 
 install/DynamoRIO:
 	cd install && wget https://github.com/DynamoRIO/dynamorio/releases/download/cronbuild-9.0.19328/DynamoRIO-Linux-9.0.19328.tar.gz
-	cd install && tar -xzf DynamoRIO-Linux-9.0.19328.tar.gz
+	cd install && tar -xzf DynamoRIO-Linux-9.0.19328.tar.gz && rm DynamoRIO-Linux-9.0.19328.tar.gz
 	touch $@
 
 install/ppcount:

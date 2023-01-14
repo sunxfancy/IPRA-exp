@@ -13,7 +13,7 @@ COMMA := ,
 MAIN_BIN = gcc/cc1
 BUILD_ACTION=build_gcc
 BUILD_TARGET=all-gcc
-INSTALL_TARGET=install-gcc
+INSTALL_TARGET=all-gcc
 
 define switch_binary
 	if [ ! -d "$(INSTALL_DIR)/bin" ]; then \
@@ -58,7 +58,7 @@ define build_gcc
 		time -o $(PWD)/$(1)/time.log make $(3) -j $(shell nproc) > $(PWD)/$(1)/build.log \
 		|| { echo "*** build failed ***"; exit 1 ; }
 	if [ ! -d "$(PWD)/install.dir" ]; then \
-		mkdir -p $(INSTALL_DIR) && cd $(BUILD_DIR)/$(1) && make $(INSTALL_TARGET) >> $(PWD)/$(1)/build.log; \
+		mkdir -p $(INSTALL_DIR) && cd $(BUILD_DIR)/$(1) && make install-gcc >> $(PWD)/$(1)/build.log; \
 		if [ "$(1)" != "instrumented" ]; then \
 			mv $(INSTALL_DIR) $(PWD)/install.dir; \
 		fi; \
