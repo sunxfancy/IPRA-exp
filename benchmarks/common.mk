@@ -15,7 +15,7 @@ GEN_HL=$(call HOT_LIST,$(1),$(2)) $(call HOT_LIST_LD,$(1),$(2))
 COMMA := ,
 
 # call GEN_VAR,pgo-thin-fdoipra3,thin,10
-GEN_VAR=$(foreach j,$(HOT_LIST_VAR),-Wl,-mllvm -Wl,-fdoipra-ccr=$(3).0 $(call GEN_HL,$(2),$(j)) -Wl,-mllvm -Wl,-fdoipra-psi=$(PWD)/$(1).$(j)-$(3).psi;)
+GEN_VAR=$(foreach j,$(HOT_LIST_VAR),-Wl,-mllvm -Wl,-fdoipra-ccr=$(3).0 $(call GEN_HL,$(2),$(j)) -Wl$(COMMA)-mllvm -Wl$(COMMA)-count-push-pop=$(PWD)/$(1).$(j)-$(3).count-push-pop -Wl,-mllvm -Wl,-fdoipra-psi=$(PWD)/$(1).$(j)-$(3).psi;)
 GEN_VARS=$(foreach j,$(RATIO_VAR),$(call GEN_VAR,$(1),$(2),$(j)))
 
 GEN_ARGS=-Wl$(COMMA)-mllvm -Wl$(COMMA)-count-push-pop=$(PWD)/$(1).count-push-pop -Wl$(COMMA)-mllvm -Wl$(COMMA)-fdoipra-psi=$(PWD)/$(1).psi
@@ -47,20 +47,17 @@ GEN_FDOIPRA_VARIANT_TARGETS = $(foreach f,$(FLAVORS),$(f).$(1) \
 BUILD_TARGETS:= $(FLAVORS)
 PERFDATA_TARGETS:= $(call GEN_FDOIPRA_VARIANT_TARGETS,perfdata)
 BENCH_TARGETS:= $(call GEN_FDOIPRA_VARIANT_TARGETS,bench)
-REGPROF_TARGETS:= $(call GEN_FDOIPRA_VARIANT_TARGETS,regprof)
-REGPROF3_TARGETS:= $(call GEN_FDOIPRA_VARIANT_TARGETS,regprof3)
 REGCOMPARE_TARGETS:= $(call GEN_FDOIPRA_VARIANT_TARGETS,regcompare)
 NCSR_TARGETS:= $(call GEN_FDOIPRA_VARIANT_TARGETS,ncsr)
 HOTLIST_TARGETS:= $(call GEN_FDOIPRA_VARIANT_TARGETS,hot_list)
 
-# .SECONDARY: $(BUILD_TARGETS) $(PERFDATA_TARGETS)  $(BENCH_TARGETS)  $(REGPROF_TARGETS)  $(NCSR_TARGETS) $(HOTLIST_TARGETS)
-# .PRECIOUS: $(BUILD_TARGETS) $(PERFDATA_TARGETS)  $(BENCH_TARGETS)  $(REGPROF_TARGETS)
-all:  $(BUILD_TARGETS) $(PERFDATA_TARGETS)  $(BENCH_TARGETS)  $(REGPROF_TARGETS)
+all:  $(BUILD_TARGETS) $(PERFDATA_TARGETS)  $(BENCH_TARGETS)  $(call GEN_FDOIPRA_VARIANT_TARGETS,regprof1) $(call GEN_FDOIPRA_VARIANT_TARGETS,regprof2) $(call GEN_FDOIPRA_VARIANT_TARGETS,regprof3)
 build:  $(BUILD_TARGETS)
 perfdata:  $(PERFDATA_TARGETS)
 bench:   $(BENCH_TARGETS)
-regprof:   $(REGPROF_TARGETS)
-regprof3:   $(REGPROF3_TARGETS)
+regprof1:    $(call GEN_FDOIPRA_VARIANT_TARGETS,regprof1)
+regprof2:    $(call GEN_FDOIPRA_VARIANT_TARGETS,regprof2)
+regprof3:    $(call GEN_FDOIPRA_VARIANT_TARGETS,regprof3)
 regcompare:   $(REGCOMPARE_TARGETS)
 ncsr:   $(NCSR_TARGETS)
 hotlist:   $(HOTLIST_TARGETS)
@@ -110,7 +107,7 @@ endef
 
 define gen_regprof
 
-$(call gen_header,$(1),$(2),regprof,.perfdata)
+$(call gen_header,$(1),$(2),regprof1,.perfdata)
 	$(REG_PROFILER) \
 		--binary="$(PWD)/$(1)/$(MAIN_BIN)$(2)" \
 		--profile="$(PWD)/$(1)$(2).perfdata" | tee $$@
@@ -208,15 +205,36 @@ $(call gen_regprof,pgo-$(1)-ipra)
 endef
 
 define mv_binary
-	 cp  $(BUILD_DIR)/$(1)/$(MAIN_BIN)    $(PWD)/$(1)/$(MAIN_BIN)
-	-cp  $(BUILD_DIR)/$(1)/$(MAIN_BIN).0  $(PWD)/$(1)/$(MAIN_BIN).1-10
-	-cp  $(BUILD_DIR)/$(1)/$(MAIN_BIN).1  $(PWD)/$(1)/$(MAIN_BIN).3-10
-	-cp  $(BUILD_DIR)/$(1)/$(MAIN_BIN).2  $(PWD)/$(1)/$(MAIN_BIN).5-10
-	-cp  $(BUILD_DIR)/$(1)/$(MAIN_BIN).3  $(PWD)/$(1)/$(MAIN_BIN).10-10
-	-cp  $(BUILD_DIR)/$(1)/$(MAIN_BIN).4  $(PWD)/$(1)/$(MAIN_BIN).1-20
-	-cp  $(BUILD_DIR)/$(1)/$(MAIN_BIN).5  $(PWD)/$(1)/$(MAIN_BIN).3-20
-	-cp  $(BUILD_DIR)/$(1)/$(MAIN_BIN).6  $(PWD)/$(1)/$(MAIN_BIN).5-20
-	-cp  $(BUILD_DIR)/$(1)/$(MAIN_BIN).7  $(PWD)/$(1)/$(MAIN_BIN).10-20
+	 @cp  $(BUILD_DIR)/$(1)/$(MAIN_BIN)    $(PWD)/$(1)/$(MAIN_BIN)
+	-@cp  $(BUILD_DIR)/$(1)/$(MAIN_BIN).0  $(PWD)/$(1)/$(MAIN_BIN).1-10
+	-@cp  $(BUILD_DIR)/$(1)/$(MAIN_BIN).1  $(PWD)/$(1)/$(MAIN_BIN).3-10
+	-@cp  $(BUILD_DIR)/$(1)/$(MAIN_BIN).2  $(PWD)/$(1)/$(MAIN_BIN).5-10
+	-@cp  $(BUILD_DIR)/$(1)/$(MAIN_BIN).3  $(PWD)/$(1)/$(MAIN_BIN).10-10
+	-@cp  $(BUILD_DIR)/$(1)/$(MAIN_BIN).4  $(PWD)/$(1)/$(MAIN_BIN).1-20
+	-@cp  $(BUILD_DIR)/$(1)/$(MAIN_BIN).5  $(PWD)/$(1)/$(MAIN_BIN).3-20
+	-@cp  $(BUILD_DIR)/$(1)/$(MAIN_BIN).6  $(PWD)/$(1)/$(MAIN_BIN).5-20
+	-@cp  $(BUILD_DIR)/$(1)/$(MAIN_BIN).7  $(PWD)/$(1)/$(MAIN_BIN).10-20
+	 @cat $(PWD)/$(1).count-push-pop | $(COUNTSUM) > $(1).regprof0
+	-@cat $(PWD)/$(1).1-10.count-push-pop | $(COUNTSUM) > $(1).1-10.regprof0
+	-@cat $(PWD)/$(1).3-10.count-push-pop | $(COUNTSUM) > $(1).3-10.regprof0
+	-@cat $(PWD)/$(1).5-10.count-push-pop | $(COUNTSUM) > $(1).5-10.regprof0
+	-@cat $(PWD)/$(1).10-10.count-push-pop | $(COUNTSUM) > $(1).10-10.regprof0
+	-@cat $(PWD)/$(1).1-20.count-push-pop | $(COUNTSUM) > $(1).1-20.regprof0
+	-@cat $(PWD)/$(1).3-20.count-push-pop | $(COUNTSUM) > $(1).3-20.regprof0
+	-@cat $(PWD)/$(1).5-20.count-push-pop | $(COUNTSUM) > $(1).5-20.regprof0
+	-@cat $(PWD)/$(1).10-20.count-push-pop | $(COUNTSUM) > $(1).10-20.regprof0
+endef
+
+define clean_count_push_pop
+	-@rm -f $(PWD)/$(1).count-push-pop
+	-@rm -f $(PWD)/$(1).1-10.count-push-pop
+	-@rm -f $(PWD)/$(1).3-10.count-push-pop
+	-@rm -f $(PWD)/$(1).5-10.count-push-pop
+	-@rm -f $(PWD)/$(1).10-10.count-push-pop
+	-@rm -f $(PWD)/$(1).1-20.count-push-pop
+	-@rm -f $(PWD)/$(1).3-20.count-push-pop
+	-@rm -f $(PWD)/$(1).5-20.count-push-pop
+	-@rm -f $(PWD)/$(1).10-20.count-push-pop
 endef
 
 clean:

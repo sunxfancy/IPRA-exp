@@ -24,13 +24,13 @@ static void
 event_exit(void)
 {
 #ifdef SHOW_RESULTS
-    char msg[512];
-    int len;
-    len = dr_snprintf(msg, sizeof(msg) / sizeof(msg[0]), "%u/%u push and pop executed in %u instructions.",
-                      global_push_count, global_pop_count, global_total_count);
-    DR_ASSERT(len > 0);
-    NULL_TERMINATE(msg);
-    DISPLAY_STRING(msg);
+    file_t f;
+    const char* name = getenv("LLVM_IRPP_PROFILE");
+    if (name == NULL) name = "regprof2.raw";
+    f = dr_open_file(name, DR_FILE_WRITE_APPEND);
+    dr_fprintf(f, "dynamic push count: %lu\n", global_push_count);
+    dr_fprintf(f, "dynamic pop  count: %lu\n", global_pop_count);
+    dr_close_file(f);
 #endif /* SHOW_RESULTS */
     drx_exit();
     drreg_exit();
@@ -134,11 +134,12 @@ dr_client_main(client_id_t id, int argc, const char *argv[])
     /* Register opcode event. */
     dr_register_exit_event(event_exit);
     if (!drmgr_register_opcode_instrumentation_event(event_push_instruction,
-                                                     OP_push, NULL, NULL) ||
-        !drmgr_register_opcode_instrumentation_event(event_pop_instruction,
-                                                     OP_pop, NULL, NULL) ||
-        !drmgr_register_bb_instrumentation_event(event_bb_analysis, event_app_instruction,
-                                                 NULL))
+                                                     OP_push, NULL, NULL) 
+        || !drmgr_register_opcode_instrumentation_event(event_pop_instruction,
+                                                     OP_pop, NULL, NULL) 
+        // || !drmgr_register_bb_instrumentation_event(event_bb_analysis, event_app_instruction,
+        //                                          NULL)
+        )
         DR_ASSERT(false);
 
     /* Make it easy to tell, by looking at log file, which client executed. */

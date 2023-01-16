@@ -7,3 +7,6 @@
 [submodule "UMake"]
 	path = UMake
 	url = git@github.com:sunxfancy/UMake.git
+[submodule "FDO"]
+	path = FDO
+	url = git@github.com:sunxfancy/FDO.git

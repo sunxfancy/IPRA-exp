@@ -2,7 +2,7 @@ AUTOFDO_BUILD_TYPE=Release
 LLVM_BUILD_TYPE=Release
 
 PWD=$(shell pwd)
-FDO=install/FDO
+FDO=$(PWD)/install/FDO
 
 ROOT:=$(PWD)
 LLVM_IPRA = $(PWD)/LLVM-IPRA
@@ -60,11 +60,11 @@ endif
 # MOLD:= mold -run
 MOLD:= $(INSTALL_PATH)/mold-1.8.0-x86_64-linux/bin/mold -run
 
-.PHONY: build check-tools install/llvm install/autofdo install/counter install/clang_proxy install/count-sum
-build: check-tools  install/llvm install/autofdo install/counter install/clang_proxy install/count-sum install/DynamoRIO install/ppcount push-pop-counter/lib.o
+.PHONY: build check-tools install/llvm install/autofdo install/counter install/clang_proxy install/count-sum install/FDO
+build: check-tools  install/llvm install/autofdo install/counter install/clang_proxy install/count-sum install/DynamoRIO install/ppcount push-pop-counter/lib.o install/FDO
 
 
-DRRUN:=$(INSTALL_PATH)/DynamoRIO-Linux-9.0.19328/bin64/drrun -debug -loglevel 1 -c $(INSTALL_PATH)/../build/ppcount/libppcount.so -- 
+DRRUN:=$(INSTALL_PATH)/DynamoRIO-Linux-9.0.19328/bin64/drrun -debug -loglevel 1 -c $(INSTALL_PATH)/libppcount.so -- 
 
 
 define tool-available
@@ -135,8 +135,9 @@ install/mold:
 	touch $@
 
 llvm: $(BUILD_PATH)/llvm/build.ninja install/mold
-	$(MOLD) cmake --build $(BUILD_PATH)/llvm --config ${LLVM_BUILD_TYPE} -j $(shell nproc) --target clang
+	$(MOLD) cmake --build $(BUILD_PATH)/llvm --config ${LLVM_BUILD_TYPE} -j $(shell nproc) --target clang lld
 	cp $(BUILD_PATH)/llvm/bin/clang-16 install/llvm/bin/clang-16
+	cp $(BUILD_PATH)/llvm/bin/lld install/llvm/bin/lld
 
 install/llvm: $(BUILD_PATH)/llvm/build.ninja install/mold
 	mkdir -p install/llvm
@@ -178,7 +179,7 @@ install/UMake: build/UMake
 
 install/FDO: FDO
 	mkdir -p $(INSTALL_PATH) 
-	cd FDO && go build .
+	cd FDO && go build -buildvcs=false . 
 	mv FDO/FDO $(INSTALL_PATH)/FDO
 
 install/counter: utils/counter.go
@@ -269,8 +270,7 @@ install/DynamoRIO:
 install/ppcount:
 	mkdir -p build/ppcount
 	cd build/ppcount && cmake -DDynamoRIO_DIR=$(INSTALL_PATH)/DynamoRIO-Linux-9.0.19328/cmake -G Ninja ../../push-pop-counter
-	cd build/ppcount && ninja
-
+	cd build/ppcount && ninja && cp libppcount.so $(INSTALL_PATH)/libppcount.so
 jupyter:
 	jupyter notebook
 

@@ -2,12 +2,14 @@ mkfile_path := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
 BENCHMARK=clang
 include $(mkfile_path)../common.mk
 
-CLANG_VERSION=llvmorg-15.0.3
+CLANG_VERSION=llvmorg-14.0.6
 SOURCE = $(BUILD_PATH)/$(BENCHMARK)/llvm-project-$(CLANG_VERSION)/llvm
 
 common_compiler_flags += -fPIC
 
-MAIN_BIN = bin/clang-15
+CLANG_NAME=clang-14
+
+MAIN_BIN = bin/$(CLANG_NAME)
 BUILD_ACTION=build_clang
 BUILD_TARGET=clang lld
 INSTALL_TARGET=install
@@ -26,8 +28,7 @@ define build_clang
 	mkdir -p $(BUILD_DIR)/$(1)
 	mkdir -p $(PWD)/$(1)/bin
 	mkdir -p $(INSTALL_DIR)
-	rm -f $(PWD)/$(1).count-push-pop 
-	touch $(PWD)/$(1).count-push-pop
+	$(call clean_count_push_pop,$(1))
 	cd $(BUILD_DIR)/$(1) && cmake -G Ninja $(SOURCE) \
 		-DCMAKE_BUILD_TYPE=Release \
 		-DLLVM_OPTIMIZED_TABLEGEN=ON \
@@ -42,8 +43,8 @@ define build_clang
 		-DLLVM_ENABLE_PROJECTS="clang;lld;compiler-rt" \
 		-DLLVM_USE_LINKER=lld \
 		-DCMAKE_INSTALL_PREFIX=$(INSTALL_DIR) \
-		$(2) > $(PWD)/$(1)/conf.log	
-	cd $(BUILD_DIR)/$(1) && CLANG_PROXY_FOCUS=clang-15 \
+		$(2) > $(PWD)/$(1)/conf.log
+	cd $(BUILD_DIR)/$(1) && CLANG_PROXY_FOCUS=$(CLANG_NAME) \
 		CLANG_PROXY_ARGS="$(4)" CLANG_PROXY_VAR="$(5)" \
 		time -o $(PWD)/$(1)/time.log ninja $(3) -j $(shell nproc) -v > $(PWD)/$(1)/build.log \
 		|| { echo "*** build failed ***"; exit 1 ; }
@@ -53,10 +54,6 @@ define build_clang
 			mv $(INSTALL_DIR) $(PWD)/install.dir; \
 		fi; \
 	fi
-	echo "---------$(1)---------" >> ../clang.raw
-	cat $(PWD)/$(1).count-push-pop >> ../clang.raw 
-	echo "---------$(1)---------" >> ../clang.output
-	cat $(PWD)/$(1).count-push-pop | $(COUNTSUM) >> ../clang.output 
 
 	cp $(BUILD_DIR)/$(1)/bin/lld $(PWD)/$(1)/bin/lld
 	$(call mv_binary,$(1))
@@ -74,7 +71,7 @@ define clang_bench
 			-DCMAKE_C_COMPILER=$(1)/clang \
 			-DCMAKE_CXX_COMPILER=$(1)/clang++ \
 			-DLLVM_ENABLE_PROJECTS="clang" \
-		&& (ninja -t commands | head -100 > perf_commands.sh) \
+		&& (ninja -t commands | head -20 > perf_commands.sh) \
 		&& chmod +x ./perf_commands.sh; \
 	fi
 endef
@@ -114,13 +111,10 @@ $(1)$(2).perfdata: $(1)/.complete
 $(1)$(2).regprof2: $(1)/.complete
 	$(call switch_binary,$(1),$(2))
 	$(call clang_bench,$(INSTALL_DIR)/bin)
-	$(call copy_to_server,$(1),$(2))
+	rm -rf $(PWD)/$$@.raw
 	mkdir -p $(BENCH_DIR) && cd $(BENCH_DIR) && \
-		$(PERF) record -e cycles:u -j any,u -o ../$$@ -- $(TASKSET) bash ./perf_commands.sh
-	$(COPY_BACK) $(PWD)/$$@
-	$(RUN_ON_REMOTE) rm -rf $(BENCH_DIR)
-	rm -rf $$@ 
-	mv $(BUILD_PATH)/$(BENCHMARK)/$$@ $$@
+		LLVM_IRPP_PROFILE="$(PWD)/$$@.raw" $(DRRUN) bash ./perf_commands.sh
+	cat $(PWD)/$$@.raw | $(COUNTSUM) > $(PWD)/$$@
 
 $(1)$(2).regprof3: $(1).profbuild/.complete
 	$(call switch_binary,$(1).profbuild,$(2))

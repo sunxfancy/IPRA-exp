@@ -27,8 +27,7 @@ define build_gcc
 	mkdir -p $(BUILD_DIR)/$(1)
 	mkdir -p $(PWD)/$(1)/$(BENCHMARK)
 	mkdir -p $(INSTALL_DIR)
-	rm -f $(PWD)/$(1).count-push-pop 
-	touch $(PWD)/$(1).count-push-pop
+	$(call clean_count_push_pop,$(1))
 	cd $(BUILD_DIR)/$(1) && \
 		unset C_INCLUDE_PATH CPLUS_INCLUDE_PATH CFLAGS CXXFLAGS && \
  		../../gcc-releases-$(GCC_NAME)/configure -v \
@@ -63,10 +62,6 @@ define build_gcc
 			mv $(INSTALL_DIR) $(PWD)/install.dir; \
 		fi; \
 	fi 
-	echo "---------$(1)---------" >> ../gcc.raw
-	cat $(PWD)/$(1).count-push-pop >> ../gcc.raw 
-	echo "---------$(1)---------" >> ../gcc.output
-	cat $(PWD)/$(1).count-push-pop | $(COUNTSUM) >> ../gcc.output 
 	
 	$(call mv_binary,$(1))
 	$(call switch_binary,$(1))
@@ -116,12 +111,10 @@ $(1)$(2).perfdata: $(1)/.complete
 $(1)$(2).regprof2: $(1)/.complete
 	$(call switch_binary,$(1),$(2))
 	$(call run_bench,$(INSTALL_DIR)/bin)
-	$(call copy_to_server,$(1),$(2))
-	cd $(BENCH_DIR) && $(PERF) record -e cycles:u -j any,u -o ../$$@ -- $(TASKSET) bash ./perf_commands.sh
-	$(COPY_BACK) $(PWD)/$$@
-	$(RUN_ON_REMOTE) rm -rf $(PWD)/bench.dir/
-	rm -rf $$@ 
-	mv $(BUILD_PATH)/$(BENCHMARK)/$$@ $$@
+	rm -rf $(PWD)/$$@.raw
+	mkdir -p $(BENCH_DIR) && cd $(BENCH_DIR) && \
+		LLVM_IRPP_PROFILE="$(PWD)/$$@.raw" $(DRRUN) bash ./perf_commands.sh
+	cat $(PWD)/$$@.raw | $(COUNTSUM) > $(PWD)/$$@
 
 $(1)$(2).regprof3: $(1).profbuild/.complete
 	$(call switch_binary,$(1).profbuild,$(2))

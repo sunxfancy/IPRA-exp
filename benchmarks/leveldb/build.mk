@@ -18,8 +18,8 @@ define build_leveldb
 	if [ -d "$(PWD)/$(1)" ]; then rm -rf $(PWD)/$(1); fi
 	mkdir -p $(BUILD_DIR)/$(1)
 	mkdir -p $(PWD)/$(1)
-	rm -f $(PWD)/$(1).count-push-pop 
-	touch $(PWD)/$(1).count-push-pop
+	$(call clean_count_push_pop,$(1))
+
 	cd $(BUILD_DIR)/$(1) && cmake -G Ninja $(SOURCE) \
 		-DCMAKE_BUILD_TYPE=Release \
 		-DCMAKE_C_COMPILER=$(NCC) \
@@ -30,10 +30,8 @@ define build_leveldb
 		CLANG_PROXY_ARGS="$(4)" CLANG_PROXY_VAR="$(5)" \
 		time -o $(PWD)/$(1)/time.log ninja $(3) -j $(shell nproc) -v > $(PWD)/$(1)/build.log \
 		|| { echo "*** build failed ***"; exit 1 ; }
-	echo "---------$(1)---------" >> ../leveldb.raw
-	cat $(PWD)/$(1).count-push-pop >> ../leveldb.raw 
-	echo "---------$(1)---------" >> ../leveldb.output
-	cat $(PWD)/$(1).count-push-pop | $(COUNTSUM) >> ../leveldb.output 
+	cat $(PWD)/$(1).count-push-pop | $(COUNTSUM) > $(1).regprof0
+	
 	$(call mv_binary,$(1))
 endef
 
@@ -48,11 +46,11 @@ $(1)$(2).perfdata: $(1)/.complete
 	mv $(BUILD_PATH)/$(BENCHMARK)/$$@ $$@
 
 $(1)$(2).regprof2: $(1)/.complete
+	rm -rf $(PWD)/$$@.raw
 	mkdir -p $(BENCH_DIR) && cd $(BENCH_DIR) && \
-		$(PERF) record -e cycles:u -j any,u -o ../$$@ -- $(TASKSET) $(PWD)/$(1)/$(MAIN_BIN)$(2) --db=$(BENCH_DIR)
+		LLVM_IRPP_PROFILE="$(PWD)/$$@.raw" $(DRRUN) $(PWD)/$(1)/$(MAIN_BIN)$(2) --db=$(BENCH_DIR)
 	rm -rf $(BENCH_DIR) 
-	rm -rf $$@ 
-	mv $(BUILD_PATH)/$(BENCHMARK)/$$@ $$@
+	cat $(PWD)/$$@.raw | $(COUNTSUM) > $(PWD)/$$@
 
 $(1)$(2).regprof3: $(1).profbuild/.complete
 	rm -rf $(PWD)/$$@.raw

@@ -38,8 +38,8 @@ define build_mysql
 	mkdir -p $(BUILD_DIR)/$(1)
 	mkdir -p $(PWD)/$(1)/bin
 	mkdir -p $(INSTALL_DIR)
-	rm -f $(PWD)/$(1).count-push-pop 
-	touch $(PWD)/$(1).count-push-pop
+	$(call clean_count_push_pop,$(1))
+
 	cd $(BUILD_DIR)/$(1) && cmake -G Ninja $(SOURCE) \
 		-DWITH_BOOST=$(SOURCE)/boost/boost_1_77_0 \
 		-DCMAKE_INSTALL_PREFIX=$(INSTALL_DIR) \
@@ -67,10 +67,6 @@ define build_mysql
 			mv $(INSTALL_DIR) $(PWD)/install.dir; \
 		fi; \
 	fi
-	echo "---------$(1)---------" >> ../mysql.raw
-	cat $(PWD)/$(1).count-push-pop >> ../mysql.raw 
-	echo "---------$(1)---------" >> ../mysql.output
-	cat $(PWD)/$(1).count-push-pop | $(COUNTSUM) >> ../mysql.output 
 	
 	$(call mv_binary,$(1))
 	$(call switch_binary,$(1))
@@ -109,17 +105,14 @@ $(1)$(2).perfdata: $(1)/.complete
 $(1)$(2).regprof2: $(1)/.complete
 	$(call switch_binary,$(1),$(2))
 	cp -f $(mkfile_path)loadtest-funcs.sh ./loadtest-funcs.sh
-	$(call copy_to_server,$(1),$(2))
 	cd $(BUILD_PATH)/$(BENCHMARK) && \
 		$(RUN) $(mkfile_path)loadtest-funcs.sh setup_mysql $(1) 2>&1
+	rm -rf $(PWD)/$$@.raw
 	cd $(BUILD_PATH)/$(BENCHMARK) && \
-		bash "$(mkfile_path)loadtest-funcs.sh" run_perf -o "$(BUILD_PATH)/$(BENCHMARK)/$$@" -- \
-		bash "$(mkfile_path)loadtest-funcs.sh" run_sysbench_loadtest "$(1)$(2)" \
-		|| { echo "*** loadtest failed ***" ; rm -f $(PWD)/$$@ ; exit 1; }
-	$(COPY_BACK) $(PWD)/$$@
-	$(RUN_ON_REMOTE) rm -rf $(PWD)/
-	rm -rf $$@ 
-	mv $(BUILD_PATH)/$(BENCHMARK)/$$@ $$@
+		LLVM_IRPP_PROFILE="$(PWD)/$$@.raw" \
+		$(DRRUN) bash "$(mkfile_path)loadtest-funcs.sh" run_sysbench_loadtest "$(1)$(2)" \
+			|| { echo "*** loadtest failed ***" ; rm -f $(PWD)/$$@ ; exit 1; }
+	cat $(PWD)/$$@.raw | $(COUNTSUM) > $(PWD)/$$@
 	
 $(1)$(2).regprof3: $(1).profbuild/.complete
 	$(call switch_binary,$(1).profbuild,$(2))
@@ -143,7 +136,7 @@ $(1)$(2).bench: $(1)/.complete
 	$(call copy_to_server,$(1),$(2))
 	$(RUN) $(mkfile_path)loadtest-funcs.sh setup_mysql $(1) 2>&1
 	cd $(BUILD_PATH)/$(BENCHMARK) && \
-	$(RUN) $(mkfile_path)loadtest-funcs.sh run_sysbench_benchmark $(1)$(2) 5 
+		$(RUN) $(mkfile_path)loadtest-funcs.sh run_sysbench_benchmark $(1)$(2) 5 
 	$(RUN_FOR_REMOTE) mkdir -p $(BENCH_DIR)/
 	$(COPY_BACK) $(BENCH_DIR)/$(1)$(2)
 	$(RUN_ON_REMOTE) rm -rf $(PWD)/
