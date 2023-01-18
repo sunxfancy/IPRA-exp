@@ -227,7 +227,7 @@ login:
 # upload to HPCC
 upload:
 	tar cf - ./Makefile ./make ./benchmarks  ./example ./singularity ./push-pop-counter \
-		./install/autofdo ./install/llvm ./install/count-sum ./install/counter \
+		./install/autofdo ./install/llvm ./install/count-sum ./install/counter ./install/DynamoRIO-Linux-9.0.19328 ./install/libppcount.so \
 		| ssh $(HPCC_USER)@$(HPCC_HOST)  "cd /rhome/xsun042/bigdata/IPRA-exp && tar xvf -"
 
 # scp -pr ./benchmarks $(HPCC_USER)@$(HPCC_HOST):/rhome/xsun042/bigdata/IPRA-exp
@@ -241,9 +241,12 @@ upload-image:
 upload-bench:
 	tar cf - ./Makefile ./make ./benchmarks | ssh $(HPCC_USER)@$(HPCC_HOST)  "cd /rhome/xsun042/bigdata/IPRA-exp && tar xvf -"
 
+upload-llvm:
+	tar cf - ./install/llvm | ssh $(HPCC_USER)@$(HPCC_HOST)  "cd /rhome/xsun042/bigdata/IPRA-exp && tar xvf -"
+
 hpcc: upload-bench
-	ssh $(HPCC_USER)@$(HPCC_HOST) "cd /rhome/xsun042/bigdata/IPRA-exp && \
-	 id=$$(sbatch benchmarks/hpcc-base.sh) && \
+	ssh $(HPCC_USER)@$(HPCC_HOST) "cd /rhome/xsun042/bigdata/IPRA-exp && bash benchmarks/test.sh && \
+	 id=$$(sacct --format=JobId -n -p -S now | sed 's/\.batch//g' | sed 's/\.extern//g' | sort -u | sed 's/|//g') && \
 	 sbatch --dependency=afterok:$${id} benchmarks/hpcc.sh"
 
 copy-google-lib:

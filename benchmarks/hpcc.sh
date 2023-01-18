@@ -43,10 +43,11 @@ function build() {
 }
 
 function bench() {
-    sbatch benchmarks/bench.sh clang
+    clang_id=$(sbatch --parsable benchmarks/bench.sh clang | awk '{print $4}')
     sbatch benchmarks/bench.sh leveldb
     sbatch benchmarks/bench.sh gcc
     # sbatch benchmarks/bench.sh mysql
+    sbatch --dependency=afterok:$clang_id benchmarks/bench.sh clang
 }
 
 function regprof1() {

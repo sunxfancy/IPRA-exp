@@ -1,16 +1,16 @@
 #!/bin/bash
-
+pwd=`pwd`
 function setup_mysql() {
   local -r mysql_dir="$1"
+  rm -rf "${mysql_dir}"
+  mkdir -p "${mysql_dir}/data"
   echo "Setup in directory: ${mysql_dir} ... "
   cat <<EOF > install.dir/my.cnf
 [client]
 local-infile = 1
 loose-local-infile = 1
-port=53316
-mysqlx-port=53317
-socket=/tmp/mysqltest.sock
-mysqlx_socket=/tmp/mysqlxtest.sock
+socket=$pwd/${mysql_dir}/mysqltest.sock
+mysqlx_socket=$pwd/${mysql_dir}/mysqlxtest.sock
 
 [server]
 local-infile = 1
@@ -19,15 +19,14 @@ local-infile = 1
 default-authentication-plugin=mysql_native_password
 local-infile = 1
 secure_file_priv = ''
-port=53316
-mysqlx-port=53317
-socket=/tmp/mysqltest.sock
-mysqlx_socket=/tmp/mysqlxtest.sock
+socket=$pwd/${mysql_dir}/mysqltest.sock
+mysqlx_socket=$pwd/${mysql_dir}/mysqlxtest.sock
+skip-networking
 
 EOF
   rm -fr "install.dir/data"
   "install.dir/bin/mysqld" \
-      --defaults-file=install.dir/my.cnf --initialize-insecure --user=${USER}
+      --defaults-file=install.dir/my.cnf --datadir=$pwd/${mysql_dir}/data --initialize-insecure --user=${USER} 
   if [[ "$?" -ne 0 ]]; then echo "*** setup failed ***" ; return 1; fi
   return 0
 }
@@ -38,8 +37,9 @@ function start_mysqld() {
   fi
   local -r mysql_dir="$1"
   echo "Starting mysqld in ${mysql_dir} ..."
-  "install.dir/bin/mysqld" \
-      --defaults-file=install.dir/my.cnf --user=$USER &
+  "install.dir/bin/mysqld_safe" --help
+  "install.dir/bin/mysqld_safe" \
+      --defaults-file=install.dir/my.cnf --datadir=$pwd/${mysql_dir}/data --skip-mysqlx --user=$USER &
   echo "Sleeping 8 seconds to wait for server up ..." 
   sleep 8
 }
@@ -144,11 +144,11 @@ function run_sysbench_test() {
   local -r run_dir="bench.dir/${mysql_dir}"
   mkdir -p "$run_dir"
   sysbench "${test}" --table-size=${table_size} --num-threads=1 --rand-type=uniform --rand-seed=1 --db-driver=mysql \
-    --mysql-db=sysbench --tables=1 --mysql-socket=/tmp/mysqltest.sock --mysql-user=root prepare
+    --mysql-db=sysbench --tables=1 --mysql-socket=$pwd/${mysql_dir}/mysqltest.sock --mysql-user=root prepare
   {
     if [[ "${table_size}" -ge "1000000" ]]; then
       sysbench "${test}" --table-size=${table_size} --tables=1 --num-threads=1 --rand-type=uniform --rand-seed=1 --db-driver=mysql \
-        --mysql-db=sysbench --mysql-socket=/tmp/mysqltest.sock --mysql-user=root prewarm
+        --mysql-db=sysbench --mysql-socket=$pwd/${mysql_dir}/mysqltest.sock --mysql-user=root prewarm
     fi
   }
   echo Running test: "${test}" ${iterations}x
@@ -163,23 +163,23 @@ function run_sysbench_test() {
     $(PERF_COMMAND) --pid "`pgrep -x $<`" --repeat 5 -- \
       sysbench "${test}" --table-size=${table_size} --tables=1 --num-threads=1 --rand-type=uniform --rand-seed=1 --db-driver=mysql \
         --events=${event_number} --time=0 --rate=0 ${additional_args} \
-        --mysql-db=sysbench --mysql-socket=/tmp/mysqltest.sock --mysql-user=root run
+        --mysql-db=sysbench --mysql-socket=$pwd/${mysql_dir}/mysqltest.sock --mysql-user=root run
   else
     for i in $(seq 1 $iterations); do
       sysbench "${test}" --table-size=${table_size} --tables=1 --num-threads=1 --rand-type=uniform --rand-seed=1 --db-driver=mysql \
         --events=${event_number} --time=0 --rate=0 ${additional_args} \
-        --mysql-db=sysbench --mysql-socket=/tmp/mysqltest.sock --mysql-user=root run >& "${run_dir}"/"${test}".$i.log
+        --mysql-db=sysbench --mysql-socket=$pwd/${mysql_dir}/mysqltest.sock --mysql-user=root run >& "${run_dir}"/"${test}".$i.log
     done
   fi
 
   sysbench "${test}" --table-size=${table_size} --tables=1 --num-threads=1 --rand-type=uniform --rand-seed=1 --db-driver=mysql \
-    --mysql-db=sysbench --mysql-socket=/tmp/mysqltest.sock --mysql-user=root cleanup
+    --mysql-db=sysbench --mysql-socket=$pwd/${mysql_dir}/mysqltest.sock --mysql-user=root cleanup
 }
 
 function run_sysbench_loadtest() {
   local -r mysql_dir="$1"
   start_mysqld "$mysql_dir"
-  install.dir/bin/mysql -u root --socket=/tmp/mysqltest.sock -e "DROP DATABASE IF EXISTS sysbench; CREATE DATABASE sysbench;"
+  install.dir/bin/mysql -u root --socket=$pwd/${mysql_dir}/mysqltest.sock -e "DROP DATABASE IF EXISTS sysbench; CREATE DATABASE sysbench;"
   echo "Running sysbench load test..."
   run_sysbench_test "$mysql_dir" oltp_read_write 8 5000 500
   run_sysbench_test "$mysql_dir" oltp_update_index 8 5000 500

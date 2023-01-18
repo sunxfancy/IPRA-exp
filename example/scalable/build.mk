@@ -4,7 +4,7 @@ PROFILE_DIR:=$(PWD)/pgo
 LINKER_FLAGS:=-Wl,-z,keep-text-section-prefix -Wl,--build-id -fno-optimize-sibling-calls -Wl,-mllvm -Wl,-fast-isel=false \
 			  -fsplit-machine-functions -Wl,-Bsymbolic-non-weak-functions \
 			  -Wl,-mllvm -Wl,-EnablePushPopProfile -Wl,-mllvm -Wl,-EnableSpillBytesProfile $(ROOT)/push-pop-counter/lib.o
-FDOIPRA_FLAGS:=-Wl,-mllvm -Wl,-debug-only=fdo-ipra -Wl,-mllvm -Wl,-fdo-ipra -Wl,-mllvm -Wl,-fdoipra-both-hot  # -Wl,-mllvm -Wl,-fdoipra-ch -Wl,-mllvm -Wl,-fdoipra-hc -Wl,-mllvm -Wl,-fdoipra-use-caller-reg 
+FDOIPRA_FLAGS:=-Wl,-mllvm -Wl,-fdoipra-new-impl -Wl,-mllvm -Wl,-debug-only=fdo-ipra -Wl,-mllvm -Wl,-fdo-ipra -Wl,-mllvm -Wl,-fdoipra-both-hot  # -Wl,-mllvm -Wl,-fdoipra-ch -Wl,-mllvm -Wl,-fdoipra-hc -Wl,-mllvm -Wl,-fdoipra-use-caller-reg 
 #-Wl,-mllvm -Wl,-disable-thinlto-funcattrs
 
 SOURCE:=$(mkfile_path)test.c $(mkfile_path)main.c
@@ -20,7 +20,7 @@ define build
 endef
 
 
-all: thin full thin-fdoipra full-fdoipra
+all: thin full full-fdoipra thin-fdoipra 
 	@echo "Full LTO"
 	@cat full/regprof3.raw
 	@echo "Thin LTO"
