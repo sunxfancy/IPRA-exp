@@ -39,7 +39,7 @@ function start_mysqld() {
   echo "Starting mysqld in ${mysql_dir} ..."
   "install.dir/bin/mysqld_safe" --help
   "install.dir/bin/mysqld_safe" \
-      --defaults-file=install.dir/my.cnf --datadir=$pwd/${mysql_dir}/data --skip-mysqlx --user=$USER &
+      --defaults-file=install.dir/my.cnf --datadir=$pwd/${mysql_dir}/data --skip-mysqlx --pid-file=$pwd/${mysql_dir}/mysqld.pid --user=$USER &
   echo "Sleeping 8 seconds to wait for server up ..." 
   sleep 8
 }
@@ -57,7 +57,8 @@ function kill_prog_listening() {
 }
 
 function stop_mysqld() {
-  kill_prog_listening mysqld 53317
+  local -r mysql_dir="$1"
+  kill `cat $pwd/${mysql_dir}/mysqld.pid`
   sleep 3
 }
 
@@ -186,7 +187,7 @@ function run_sysbench_loadtest() {
   run_sysbench_test "$mysql_dir" oltp_delete 8 5000 500
   run_sysbench_test "$mysql_dir" select_random_ranges 8 5000 500
   run_sysbench_test "$mysql_dir" oltp_read_only 8 5000 500
-  stop_mysqld
+  stop_mysqld "$mysql_dir"
 }
 
 function run_sysbench_benchmark() {
