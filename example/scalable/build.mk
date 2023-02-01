@@ -4,8 +4,8 @@ PROFILE_DIR:=$(PWD)/pgo
 LINKER_FLAGS:=-Wl,-z,keep-text-section-prefix -Wl,--build-id -fno-optimize-sibling-calls -Wl,-mllvm -Wl,-fast-isel=false \
 			  -fsplit-machine-functions -Wl,-Bsymbolic-non-weak-functions \
 			  -Wl,-mllvm -Wl,-EnablePushPopProfile -Wl,-mllvm -Wl,-EnableSpillBytesProfile $(ROOT)/push-pop-counter/lib.o
-FDOIPRA_FLAGS:=-Wl,-mllvm -Wl,-fdoipra-new-impl -Wl,-mllvm -Wl,-debug-only=fdo-ipra -Wl,-mllvm -Wl,-fdo-ipra -Wl,-mllvm -Wl,-fdoipra-both-hot  # -Wl,-mllvm -Wl,-fdoipra-ch -Wl,-mllvm -Wl,-fdoipra-hc -Wl,-mllvm -Wl,-fdoipra-use-caller-reg 
-#-Wl,-mllvm -Wl,-disable-thinlto-funcattrs
+FDOIPRA_FLAGS:= -Wl,-mllvm -Wl,-debug-only=fdo-ipra -Wl,-mllvm -Wl,-fdo-ipra -Wl,-mllvm -Wl,-fdoipra-both-hot  # -Wl,-mllvm -Wl,-fdoipra-ch -Wl,-mllvm -Wl,-fdoipra-hc -Wl,-mllvm -Wl,-fdoipra-use-caller-reg 
+#-Wl,-mllvm -Wl,-disable-thinlto-funcattrs -Wl,-mllvm -Wl,-fdoipra-new-impl
 
 SOURCE:=$(mkfile_path)test.c $(mkfile_path)main.c
 
@@ -17,10 +17,11 @@ define build
 	$(NCC) $2 $3 -fuse-ld=lld -Wl,--save-temps -O3 $1/test.o $1/main.o -o $1/main 
 	$(NCC) $2 $3 -fuse-ld=lld -O3 $1/test.o $1/main.o -o $1/main -###
 	objdump -d $1/main > $1/main.s
+	$(LLVM_ROOT_PATH)/bin/llvm-dwarfdump $1/main
 endef
 
-
-all: thin full full-fdoipra thin-fdoipra 
+.PHONY: all pgo full thin full-fdoipra thin-fdoipra clean lldb-full-fdoipra
+all: thin full thin-fdoipra full-fdoipra
 	@echo "Full LTO"
 	@cat full/regprof3.raw
 	@echo "Thin LTO"
