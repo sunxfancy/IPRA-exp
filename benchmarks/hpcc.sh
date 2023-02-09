@@ -43,11 +43,10 @@ function build() {
 }
 
 function bench() {
-    clang_id=$(sbatch --parsable benchmarks/bench.sh clang | awk '{print $4}')
     sbatch benchmarks/bench.sh leveldb
     sbatch benchmarks/bench.sh gcc
-    # sbatch benchmarks/bench.sh mysql
-    sbatch --dependency=afterok:$clang_id benchmarks/bench.sh clang
+    sbatch benchmarks/bench.sh mysql
+    sbatch benchmarks/bench.sh clang
 }
 
 function regprof1() {
@@ -55,7 +54,7 @@ function regprof1() {
     run mysql regprof1
     run gcc regprof1
     run leveldb regprof1
-}
+} 
 
 function regprof2() {
     run clang regprof2
@@ -73,8 +72,8 @@ function regprof3() {
 
 function all() {
     build
-    regprof1
-    regprof2
+    # regprof1
+    # regprof2
     regprof3
 }
 

@@ -33,3 +33,17 @@ bug5.wrong: bug5.ll $(mkfile_path)build.mk $(NCXX)
 	sed -i 's/attributes #0 = {/attributes #0 = { "no_callee_saved_registers"/g' bug5-wrong.ll
 	$(NCXX) -S -O3 bug5-wrong.ll -o $@.S
 	$(NCXX) $@.S -o $@
+
+bug6.ll: $(mkfile_path)bug6.cpp $(mkfile_path)build.mk $(NCXX)
+	$(NCXX) -S -O3 -emit-llvm $(mkfile_path)bug6.cpp -o bug6.ll
+
+bug6.correct: bug6.ll $(mkfile_path)build.mk $(NCXX)
+	$(NCXX) -S bug6.ll -o $@.S
+	$(NCXX) $@.S -o $@
+
+# sed -i 's/attributes #0 = {/attributes #0 = { "no_caller_saved_registers"/g' bug6-wrong.ll
+bug6.wrong: bug6.ll $(mkfile_path)build.mk $(NCXX)
+	cp bug6.ll bug6-wrong.ll
+	sed -i 's/attributes #1 = {/attributes #1 = { "no_caller_saved_registers"/g' bug6-wrong.ll
+	$(NCXX) -S -O3 bug6-wrong.ll -o $@.S
+	$(NCXX) $@.S -o $@
