@@ -42,11 +42,26 @@ function build() {
     run leveldb
 }
 
+function bench_each() {
+    echo sbatch --parsable benchmarks/bench.sh $1
+    job_id=$(sbatch --parsable benchmarks/bench.sh $1)
+    host=`scontrol show job $job_id | grep ' NodeList' | awk -F'=' '{print $2}'`
+    until [ "$host" != "(null)" ]
+    do
+        echo "Waiting for the job executed ..."
+        host=`scontrol show job $job_id | grep ' NodeList' | awk -F'=' '{print $2}'`
+        sleep 3
+    done
+    echo sbatch --parsable --dependency=after:${job_id} -w $host benchmarks/bench.sh $1
+    sbatch --parsable --dependency=after:${job_id} -w $host benchmarks/bench.sh $1
+}
+
+
 function bench() {
-    sbatch benchmarks/bench.sh leveldb
-    sbatch benchmarks/bench.sh gcc
-    sbatch benchmarks/bench.sh mysql
-    sbatch benchmarks/bench.sh clang
+    bench_each leveldb
+    bench_each gcc
+    bench_each mysql
+    bench_each clang
 }
 
 function regprof1() {

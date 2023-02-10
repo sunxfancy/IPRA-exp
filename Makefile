@@ -283,5 +283,12 @@ clean:
 deepclean:
 	rm -rf $(OUTPUT_PATH) $(BUILD_PATH) $(INSTALL_PATH)
 
+clean-bench:
+	rm -rf $(OUTPUT_PATH)/benchmarks/clang/*.bench \
+		   $(OUTPUT_PATH)/benchmarks/mysql/*.bench \
+		   $(OUTPUT_PATH)/benchmarks/gcc/*.bench \
+		   $(OUTPUT_PATH)/benchmarks/leveldb/*.bench \
+		   *.parallel_joblog
+
 include benchmarks/build.mk
 include example/build.mk
