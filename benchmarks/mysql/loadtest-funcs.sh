@@ -201,7 +201,7 @@ function run_sysbench_benchmark() {
   run_sysbench_test "$mysql_dir" oltp_delete "$iterations" 10000 2500 "--range_selects=off --skip_trx"
   run_sysbench_test "$mysql_dir" select_random_ranges "$iterations" 10000 2500 "--range_selects=off --skip_trx"
   run_sysbench_test "$mysql_dir" oltp_read_only "$iterations" 500000 30000 "--range_selects=off --skip_trx"
-  stop_mysqld
+  stop_mysqld "$mysql_dir"
 
   local -a benchmarks=( select_random_ranges oltp_delete oltp_read_only oltp_read_write oltp_update_index )
   for bn in "${benchmarks[@]}"; do
