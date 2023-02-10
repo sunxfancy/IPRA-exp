@@ -91,6 +91,7 @@ $(1)$(2).perfdata: $(1)/.complete
 	$(call switch_binary,$(1),$(2))
 	cp -f $(mkfile_path)loadtest-funcs.sh ./loadtest-funcs.sh
 	$(call copy_to_server,$(1),$(2))
+	rm -rf $(BUILD_PATH)/$(BENCHMARK)/$(1)$(2)
 	cd $(BUILD_PATH)/$(BENCHMARK) && \
 		$(RUN) $(mkfile_path)loadtest-funcs.sh setup_mysql $(1) 2>&1
 	cd $(BUILD_PATH)/$(BENCHMARK) && \
@@ -101,10 +102,12 @@ $(1)$(2).perfdata: $(1)/.complete
 	$(RUN_ON_REMOTE) rm -rf $(PWD)/
 	rm -rf $$@ 
 	mv $(BUILD_PATH)/$(BENCHMARK)/$$@ $$@
+	rm -rf $(BUILD_PATH)/$(BENCHMARK)/$(1)$(2)
 
 $(1)$(2).regprof2: $(1)/.complete
 	$(call switch_binary,$(1),$(2))
 	cp -f $(mkfile_path)loadtest-funcs.sh ./loadtest-funcs.sh
+	rm -rf $(BUILD_PATH)/$(BENCHMARK)/$(1)$(2)
 	cd $(BUILD_PATH)/$(BENCHMARK) && \
 		$(RUN) $(mkfile_path)loadtest-funcs.sh setup_mysql $(1) 2>&1
 	rm -rf $(PWD)/$$@.raw
@@ -113,19 +116,22 @@ $(1)$(2).regprof2: $(1)/.complete
 		$(DRRUN) bash "$(mkfile_path)loadtest-funcs.sh" run_sysbench_loadtest "$(1)$(2)" \
 			|| { echo "*** loadtest failed ***" ; rm -f $(PWD)/$$@ ; exit 1; }
 	cat $(PWD)/$$@.raw | $(COUNTSUM) > $(PWD)/$$@
+	rm -rf $(BUILD_PATH)/$(BENCHMARK)/$(1)$(2)
 	
 $(1)$(2).regprof3: $(1).profbuild/.complete
 	$(call switch_binary,$(1).profbuild,$(2))
 	cp -f $(mkfile_path)loadtest-funcs.sh ./loadtest-funcs.sh
+	rm -rf $(BUILD_PATH)/$(BENCHMARK)/$(1)$(2)
 	cd $(BUILD_PATH)/$(BENCHMARK) && \
-		$(RUN) $(mkfile_path)loadtest-funcs.sh setup_mysql $(1) 2>&1
+		$(RUN) $(mkfile_path)loadtest-funcs.sh setup_mysql $(1)$(2) 2>&1
 	rm -rf $(PWD)/$$@.raw
 	cd $(BUILD_PATH)/$(BENCHMARK) && \
 		LLVM_IRPP_PROFILE="$(PWD)/$$@.raw" \
 		bash "$(mkfile_path)loadtest-funcs.sh" run_sysbench_loadtest "$(1)$(2)" \
 			|| { echo "*** loadtest failed ***" ; rm -f $(PWD)/$$@ ; exit 1; }
 	cat $(PWD)/$$@.raw | $(COUNTSUM) > $(PWD)/$$@
-	
+	rm -rf $(BUILD_PATH)/$(BENCHMARK)/$(1)$(2)
+
 endef
 
 define gen_bench
@@ -134,7 +140,9 @@ $(1)$(2).bench: $(1)/.complete
 	$(call switch_binary,$(1),$(2))
 	cp -f $(mkfile_path)loadtest-funcs.sh ./loadtest-funcs.sh
 	$(call copy_to_server,$(1),$(2))
-	$(RUN) $(mkfile_path)loadtest-funcs.sh setup_mysql $(1) 2>&1
+	rm -rf $(BUILD_PATH)/$(BENCHMARK)/$(1)$(2)
+	cd $(BUILD_PATH)/$(BENCHMARK) && \
+		$(RUN) $(mkfile_path)loadtest-funcs.sh setup_mysql $(1)$(2) 2>&1
 	cd $(BUILD_PATH)/$(BENCHMARK) && \
 		$(RUN) $(mkfile_path)loadtest-funcs.sh run_sysbench_benchmark $(1)$(2) 5 
 	$(RUN_FOR_REMOTE) mkdir -p $(BENCH_DIR)/
@@ -142,6 +150,7 @@ $(1)$(2).bench: $(1)/.complete
 	$(RUN_ON_REMOTE) rm -rf $(PWD)/
 	rm -rf $$@ 
 	mv $(BUILD_PATH)/$(BENCHMARK)/$$@ $$@
+	rm -rf $(BUILD_PATH)/$(BENCHMARK)/$(1)$(2)
 
 endef 
 

@@ -37,9 +37,8 @@ function start_mysqld() {
   fi
   local -r mysql_dir="$1"
   echo "Starting mysqld in ${mysql_dir} ..."
-  "install.dir/bin/mysqld_safe" --help
-  "install.dir/bin/mysqld_safe" \
-      --defaults-file=install.dir/my.cnf --datadir=$pwd/${mysql_dir}/data --skip-mysqlx --pid-file=$pwd/${mysql_dir}/mysqld.pid --user=$USER &
+  echo "install.dir/bin/mysqld_safe" --defaults-file=install.dir/my.cnf --datadir=$pwd/${mysql_dir}/data --skip-mysqlx --pid-file=$pwd/${mysql_dir}/mysqld.pid --user=$USER 
+  "install.dir/bin/mysqld_safe" --defaults-file=install.dir/my.cnf --datadir=$pwd/${mysql_dir}/data --skip-mysqlx --pid-file=$pwd/${mysql_dir}/mysqld.pid --user=$USER &
   echo "Sleeping 8 seconds to wait for server up ..." 
   sleep 8
 }
@@ -196,7 +195,7 @@ function run_sysbench_benchmark() {
   shift
   local -r iterations="$1"
   start_mysqld "$mysql_dir"
-  install.dir/bin/mysql -u root -e "DROP DATABASE IF EXISTS sysbench; CREATE DATABASE sysbench;"
+  install.dir/bin/mysql -u root --socket=$pwd/${mysql_dir}/mysqltest.sock -e "DROP DATABASE IF EXISTS sysbench; CREATE DATABASE sysbench;"
   run_sysbench_test "$mysql_dir" oltp_read_write "$iterations" 10000 2500 "--range_selects=off --skip_trx"
   run_sysbench_test "$mysql_dir" oltp_update_index "$iterations" 10000 2500 "--range_selects=off --skip_trx"
   run_sysbench_test "$mysql_dir" oltp_delete "$iterations" 10000 2500 "--range_selects=off --skip_trx"
