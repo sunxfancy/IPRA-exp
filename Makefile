@@ -35,7 +35,7 @@ INSTALL_PATH = $(PWD)/install
 
 
 TASKSET:=
-# TASKSET:=$(TASKSET)
+# TASKSET:=taskset -c 0 
 
 REMOTE_PERF:=false
 PERF_PATH:=/usr/lib/linux-tools/5.15.0-57-generic/perf

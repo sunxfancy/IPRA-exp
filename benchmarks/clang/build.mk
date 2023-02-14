@@ -71,7 +71,7 @@ define clang_bench
 			-DCMAKE_C_COMPILER=$(1)/clang \
 			-DCMAKE_CXX_COMPILER=$(1)/clang++ \
 			-DLLVM_ENABLE_PROJECTS="clang" \
-		&& (ninja -t commands | head -20 > perf_commands.sh) \
+		&& (ninja -t commands | head -100 > perf_commands.sh) \
 		&& chmod +x ./perf_commands.sh; \
 	fi
 endef

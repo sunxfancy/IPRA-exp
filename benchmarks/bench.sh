@@ -15,12 +15,13 @@ module load singularity
 module load parallel
 
 # Define srun arguments:
-srun="srun -n1 -N1 --exclusive"
+# srun="srun -n1 -N1 --exclusive"
+srun=""
 # --exclusive     ensures srun uses distinct CPUs for each job step
 # -N1 -n1         allocates a single core to each task
 
 # Define parallel arguments:
-parallel="parallel -k -N 1 --delay .2 -j 4 --joblog $1.parallel_joblog --resume"
+parallel="parallel -k -N 1 --delay .2 -j 1 --joblog $1.parallel_joblog --resume"
 # -N 1              is number of arguments to pass to each job
 # --delay .2        prevents overloading the controlling node on short jobs
 # -j $SLURM_NTASKS  is the number of concurrent tasks parallel runs, so number of CPUs allocated
