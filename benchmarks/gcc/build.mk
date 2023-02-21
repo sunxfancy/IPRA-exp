@@ -5,6 +5,7 @@ include $(mkfile_path)../common.mk
 GCC_VERSION:=10.4.0
 GCC_NAME:=gcc-$(GCC_VERSION)
 SOURCE = $(BUILD_PATH)/$(BENCHMARK)/gcc-releases-$(GCC_NAME)
+BENCH_PROJECT =  $(BUILD_PATH)/$(BENCHMARK)/libevent-2.1.12-stable
 
 gen_compiler_flags =CFLAGS=$(1) CXXFLAGS=$(1)
 gen_linker_flags   =LDFLAGS=$(1)
@@ -69,16 +70,17 @@ endef
 
 define run_bench
 	if [ ! -d "$(BENCH_DIR)" ]; then \
-		cd $(ROOT) && $(MAKE) benchmarks/dparser/dparser-master && \
 		mkdir -p $(BENCH_DIR) && \
-		cd $(BENCH_DIR) && cmake -G Ninja $(BUILD_PATH)/dparser/dparser-master \
+		cd $(BENCH_DIR) && cmake -G Ninja $(BENCH_PROJECT) \
 			-DCMAKE_BUILD_TYPE=RelWithDebInfo \
 			-DCMAKE_C_FLAGS="-fPIE" \
 			-DCMAKE_C_COMPILER=$(1)/gcc \
 			-DCMAKE_LINKER=/usr/bin/gcc \
 			-DCMAKE_USER_MAKE_RULES_OVERRIDE=$(mkfile_path)makerules.cmake \
 			-DCMAKE_BUILD_WITH_INSTALL_RPATH=ON \
-		&& (ninja -t commands dparse | head -8 > perf_commands.sh) \
+		&& (ninja -t commands  | head -100 > perf_commands_raw.sh) \
+		&& echo '/^\:\ \&\&\.*/d; /^\/usr\/bin\/cmake\.*/d;' \
+		&& (sed '/^\:\ \&\&\.*/d; /^\/usr\/bin\/cmake\.*/d;' ./perf_commands_raw.sh > ./perf_commands.sh) \
 		&& chmod +x ./perf_commands.sh; \
 	fi
 endef 
@@ -101,7 +103,6 @@ define gen_perfdata
 $(1)$(2).perfdata: $(1)/.complete
 	$(call switch_binary,$(1),$(2))
 	$(call run_bench,$(INSTALL_DIR)/bin)
-	$(call copy_to_server,$(1),$(2))
 	cd $(BENCH_DIR) && $(PERF) record -e cycles:u -j any,u -o ../$$@ -- $(TASKSET) bash ./perf_commands.sh
 	$(COPY_BACK) $(PWD)/$$@
 	$(RUN_ON_REMOTE) rm -rf $(PWD)/bench.dir/
@@ -127,12 +128,13 @@ $(1)$(2).regprof3: $(1).profbuild/.complete
 
 endef
 
+# $(1)$(2).bench: $(1)/.complete
+
 define gen_bench
 
 $(1)$(2).bench: $(1)/.complete
 	$(call switch_binary,$(1),$(2))
 	$(call run_bench,$(INSTALL_DIR)/bin)
-	$(call copy_to_server,$(1),$(2))
 	cd $(BENCH_DIR) && $(PERF) stat $(PERF_EVENTS) -o ../$$@ -r5 -- $(TASKSET) bash ./perf_commands.sh
 	$(COPY_BACK) $(PWD)/$$@
 	$(RUN_ON_REMOTE) rm -rf $(PWD)/bench.dir/
@@ -166,10 +168,13 @@ instrumented.profdata:  instrumented/.complete
 	cd $(INSTRUMENTED_PROF) && $(LLVM_BIN)/llvm-profdata merge -output=$(PWD)/instrumented.profdata *
 
 
+libevent-2.1.12-stable.tar.gz:
+	wget https://github.com/libevent/libevent/releases/download/release-2.1.12-stable/libevent-2.1.12-stable.tar.gz
+
 $(GCC_NAME).zip:
 	wget https://github.com/gcc-mirror/gcc/archive/refs/tags/releases/$(GCC_NAME).zip
 
-$(SOURCE)/.complete: $(GCC_NAME).zip 
+$(SOURCE)/.complete: $(GCC_NAME).zip $(BENCH_PROJECT)/.complete
 	mkdir -p $(BUILD_PATH)/$(BENCHMARK)
 	cd $(BUILD_PATH)/$(BENCHMARK) && unzip -q -o $(PWD)/$< 
 	cd $(BUILD_PATH)/$(BENCHMARK)/gcc-releases-$(GCC_NAME) && \
@@ -177,4 +182,9 @@ $(SOURCE)/.complete: $(GCC_NAME).zip
 	&& find . -type f -name configure -exec sed -i 's/\$$CC -print-multi-os-directory/gcc -print-multi-os-directory/g' {} \; \
 	&& find . -type f -name configure -exec sed -i 's/\$$CXX -print-multi-os-directory/gcc -print-multi-os-directory/g' {} \; \
 	&& find . -type f -name configure -exec sed -i 's/\$$CC \$$CPPFLAGS \$$CFLAGS \$$LDFLAGS -print-multi-os-directory/gcc -print-multi-os-directory/g' {} \;
+	touch $@
+
+$(BENCH_PROJECT)/.complete: libevent-2.1.12-stable.tar.gz
+	mkdir -p $(BUILD_PATH)/$(BENCHMARK)
+	cd $(BUILD_PATH)/$(BENCHMARK) && tar -xzf $(PWD)/$< 
 	touch $@

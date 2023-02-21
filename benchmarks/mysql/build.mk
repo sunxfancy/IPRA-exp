@@ -144,6 +144,7 @@ $(1)$(2).bench: $(1)/.complete
 	cd $(BUILD_PATH)/$(BENCHMARK) && \
 		$(RUN) $(mkfile_path)loadtest-funcs.sh setup_mysql $(1)$(2) 2>&1
 	cd $(BUILD_PATH)/$(BENCHMARK) && \
+		$(PERF) stat $(PERF_EVENTS) -o $$@ -r5 -- \
 		$(RUN) $(mkfile_path)loadtest-funcs.sh run_sysbench_benchmark $(1)$(2) 5 
 	$(RUN_FOR_REMOTE) mkdir -p $(BENCH_DIR)/
 	$(COPY_BACK) $(BENCH_DIR)/$(1)$(2)

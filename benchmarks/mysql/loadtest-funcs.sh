@@ -203,14 +203,14 @@ function run_sysbench_benchmark() {
   run_sysbench_test "$mysql_dir" oltp_read_only "$iterations" 500000 30000 "--range_selects=off --skip_trx"
   stop_mysqld "$mysql_dir"
 
-  local -a benchmarks=( select_random_ranges oltp_delete oltp_read_only oltp_read_write oltp_update_index )
-  for bn in "${benchmarks[@]}"; do
-    rm -f "${mysql_dir}/sysbench.${bn}.result"
-    for i in $(seq 1 "$iterations") ; do
-      sed -nEe 's!^\s+transactions:\s+.*\((.*) per sec\.\)$!\1!p' build.dir/sysbench/${mysql_dir}/"${bn}"."${i}".log >> "build.dir/sysbench/${mysql_dir}/sysbench.${bn}.transPerSec"
-      sed -nEe 's!^\s+total time:\s+(.*)s$!\1!p' build.dir/sysbench/${mysql_dir}/"${bn}"."${i}".log >> "build.dir/sysbench/${mysql_dir}/sysbench.${bn}.time"
-    done
-  done
+  # local -a benchmarks=( select_random_ranges oltp_delete oltp_read_only oltp_read_write oltp_update_index )
+  # for bn in "${benchmarks[@]}"; do
+  #   rm -f "${mysql_dir}/sysbench.${bn}.result"
+  #   for i in $(seq 1 "$iterations") ; do
+  #     sed -nEe 's!^\s+transactions:\s+.*\((.*) per sec\.\)$!\1!p' build.dir/sysbench/${mysql_dir}/"${bn}"."${i}".log >> "build.dir/sysbench/${mysql_dir}/sysbench.${bn}.transPerSec"
+  #     sed -nEe 's!^\s+total time:\s+(.*)s$!\1!p' build.dir/sysbench/${mysql_dir}/"${bn}"."${i}".log >> "build.dir/sysbench/${mysql_dir}/sysbench.${bn}.time"
+  #   done
+  # done
 }
 
 function sysbench_compare() {
