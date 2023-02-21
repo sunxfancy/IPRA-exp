@@ -31,6 +31,29 @@ SingularityCE - installing it following the documentation: [https://docs.sylabs.
 
 Run `./make benchmarks` to run all benchmarks
 
+## Benchmark Output
+
+There are two folder will be generated: `build` and `tmp`. In the `build/benchmarks` folder, you will see the benchmarks result:
+1. `<target>.bench` the result of `perf stat` after running 5 times
+2. `<target>.regprof3` the result of push pop countings and spill code size
+
+You can use the python script in `benchmarks/report.ipynb` to view those data quickly, by running `./make jupyter` to start a jupyter session.
+
+
+## How to use the compiler
+
+After build the compiler, there is a folder `install/llvm` contains the clang compiler. The specific compiler flags:
+1. `-mllvm -fdo-ipra` to enable FDOIPRA
+2. `-mllvm -fdoipra-both-hot=false` to control applying optimzaiton for function which entry is hot or having hot loop in its body. When it is `false`, means only apply to function which entry is hot. (Default: true)
+3. `-fdoipra-cc=1` to enable optimaztion for Cold Callsite and Cold Callee (Default: true)
+4. `-fdoipra-ch=1` to enable optimaztion for Cold Callsite and Hot Callee  (Default: false)
+5. `-fdoipra-hc=1` to enable optimaztion for Hot Callsite and Cold Callee  (Default: false)
+6. `-fdoipra-ccr=10` to setup the Callsite Cold Ratio  (Default: 10.0)
+
+There should be a 3-steps build:
+1. Build the pgo-full version: instrumentation using `-fprofile-generate`, profiling and then rebuild the PGO with FullLTO
+2. Using perf to collect the sampling data and convert the profile using `hot-list-creator` to generate a hot function list.
+
 
 ## Available Benchmarks
 
