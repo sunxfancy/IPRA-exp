@@ -15,7 +15,7 @@ or after clone, run:
 git submodule update --init --recursive
 ```
 
-## install tools
+## Install tools
 
 Required tools:
 SingularityCE - installing it following the documentation: [https://docs.sylabs.io/guides/3.11/user-guide/](https://docs.sylabs.io/guides/3.11/user-guide/)
@@ -53,7 +53,9 @@ After build the compiler, there is a folder `install/llvm` contains the clang co
 There should be a 3-steps build:
 1. Build the pgo-full version: instrumentation using `-fprofile-generate`, profiling and then rebuild the PGO with FullLTO
 2. Using perf to collect the sampling data and convert the profile using `hot-list-creator` to generate a hot function list.
+3. Build the final binary 
 
+You can checkout the small example here: [how-to-use/build.mk](https://github.com/sunxfancy/IPRA-exp/blob/main/example/how-to-use/build.mk)
 
 ## Available Benchmarks
 
