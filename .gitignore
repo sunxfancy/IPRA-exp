@@ -12,4 +12,8 @@
 .gdb_history
 *.output
 /.cache/
+/tmp/
 compile_commands.json
+*.sif
+.ipynb_checkpoints/
+remote-data/

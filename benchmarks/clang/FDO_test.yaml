@@ -1,7 +1,0 @@
-commands:
-  - ./perf_commands.sh
-binary: ./bin/clang
-
-clangpath: ../../install/llvm/bin
-propellerpath: ../../install/autofdo
-regpath: ../../install/autofdo/create_reg_prof

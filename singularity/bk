@@ -1,0 +1,10 @@
+    apt-get -y install time software-properties-common
+    ln -s bash /bin/sh.bash
+    mv /bin/sh.bash /bin/sh
+    wget -O - https://apt.kitware.com/keys/kitware-archive-latest.asc 2>/dev/null | gpg --dearmor - | tee /etc/apt/trusted.gpg.d/kitware.gpg >/dev/null
+    apt-add-repository 'deb https://apt.kitware.com/ubuntu/ bionic main'
+    add-apt-repository ppa:ubuntu-toolchain-r/test
+    wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key| apt-key add -
+    apt-add-repository 'deb http://apt.llvm.org/bionic/ llvm-toolchain-bionic-15 main'
+    apt -y update
+    apt -y install cmake clang-15

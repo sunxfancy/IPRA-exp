@@ -1,40 +1,33 @@
-
 #include <stdlib.h>
 #include <stdio.h>
 
-extern __attribute__((noinline)) size_t report(size_t a);
+#ifdef MARK
+#define ATTR(x) __attribute__((x,noinline))
+#else
+#define ATTR(x) __attribute__((noinline))
+#endif
 
-extern 
-__attribute__((noinline))
-size_t func(size_t k) {
-    size_t a = k+1;
-    size_t b = k-2;
-    size_t c = k*3;
-    size_t d = k-4;
-    size_t e = k+5;
+ATTR(hot)
+extern size_t no_callee_saved(size_t k);
 
-    for (size_t i = 0; i < k; ++i) {
-        if (i == k-1) {
-            report(a);
-        } else {
-            a += 1;
-            b += 2;
-            c += b+1;
-            d += 4;
-            e += d-1;
-        }
-    }
-    return a+b+c+d+e;
+int g = 0;
+
+ATTR(cold)
+void no_caller_saved() {
+    printf("%d %d %d %d %d\n",g,g,g,g,g);
+    g=1;
 }
 
+ATTR(cold)
+void func() {
+    for (int i = 0; i < 100; ++i)
+        no_callee_saved(10);
+    // printf("%d %d %d %d %d", g,g,g,g,g);
+}
 
 int main(int argc, char *argv[]) {
     size_t k = 0;
     k = atoi(argv[1]);
-    size_t ans = 0;
-    for (size_t i = 0; i < 100; ++i) {
-        ans += func(k);
-    }
-    printf("ans = %zu\n", ans);    
+    func();
     return 0;
 }

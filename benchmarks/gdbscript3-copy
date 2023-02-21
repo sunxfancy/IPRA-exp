@@ -1,5 +1,0 @@
-layout asm
-b clang::Sema::InstantiatingTemplate::InstantiatingTemplate(clang::Sema&, clang::Sema::CodeSynthesisContext::SynthesisKind, clang::SourceLocation, clang::SourceRange, clang::Decl*, clang::NamedDecl*, llvm::ArrayRef<clang::TemplateArgument>, clang::sema::TemplateDeductionInfo*)
-r
-b *(_ZN5clang4Sema21InstantiatingTemplateC2ERS0_NS0_20CodeSynthesisContext13SynthesisKindENS_14SourceLocationENS_11SourceRangeEPNS_4DeclEPNS_9NamedDeclEN4llvm8ArrayRefINS_16TemplateArgumentEEEPNS_4sema21TemplateDeductionInfoE+1019)
-c

@@ -1,65 +1,67 @@
-PWD := $(shell pwd)
 mkfile_path := $(dir $(lastword $(MAKEFILE_LIST)))
-current_dir := $(notdir $(patsubst %/,%,$(dir $(mkfile_path))))
-INSTRUMENTED_PROF=$(PWD)/build.dir/instrumented/profiles
+BENCHMARK=dparser
+include $(mkfile_path)../common.mk
 
-all: pgolto pgolto-ipra pgolto-fdoipra pgolto-full pgolto-full-ipra pgolto-full-fdoipra
-bench: pgolto.bench pgolto-ipra.bench pgolto-fdoipra.bench pgolto-full.bench pgolto-full-ipra.bench pgolto-full-fdoipra.bench
-common_compiler_flags := -fuse-ld=lld  -fno-optimize-sibling-calls -mllvm -fast-isel=false -fsplit-machine-functions
-common_linker_flags := -fuse-ld=lld -fno-optimize-sibling-calls -Wl,-mllvm -Wl,-fast-isel=false -fsplit-machine-functions
+SOURCE = $(BUILD_PATH)/$(BENCHMARK)/dparser-master
 
-gen_compiler_flags = -DCMAKE_C_FLAGS=$(1) -DCMAKE_CXX_FLAGS=$(1)
-gen_linker_flags   = -DCMAKE_EXE_LINKER_FLAGS=$(1) -DCMAKE_SHARED_LINKER_FLAGS=$(1) -DCMAKE_MODULE_LINKER_FLAGS=$(1)
-gen_build_flags = $(call gen_compiler_flags,"$(common_compiler_flags) $(1)") $(call gen_linker_flags,"$(common_linker_flags) $(2)")
-COMMA := ,
-
+MAIN_BIN = bin/dparser
+BUILD_ACTION = build
+BUILD_TARGET = dparser
 
 define build
-	rm -f /tmp/count-push-pop.txt 
-	touch /tmp/count-push-pop.txt
-	mkdir -p build.dir/$(1)
-	cd build.dir/$(1) && cmake -G Ninja ../../dparser-master \
+	mkdir -p $(BUILD_DIR)/$(1)
+	mkdir -p $(PWD)/$(1)/bin
+	mkdir -p $(INSTALL_DIR)
+	rm -f $(PWD)/$(1).count-push-pop 
+	touch $(PWD)/$(1).count-push-pop
+	cd $(BUILD_DIR)/$(1) && cmake -G Ninja $(SOURCE) \
 		-DCMAKE_BUILD_TYPE=Release \
 		-DCMAKE_C_COMPILER=$(NCC) \
 		-DCMAKE_CXX_COMPILER=$(NCXX) \
-		$(2)
-	cd build.dir/$(1) && CLANG_PROXY_FOCUS=make_dparser CLANG_PROXY_ARGS="-Wl,-mllvm -Wl,-count-push-pop" time -o time.log ninja -j $(shell nproc) -v > build.log
-	echo "---------$(1)---------" >> ../dparser.output
-	cat /tmp/count-push-pop.txt | $(COUNTSUM) >> ../dparser.output 
+		-DCMAKE_INSTALL_PREFIX=$(INSTALL_DIR) \
+		$(2) > $(PWD)/$(1)/conf.log
+	cd $(BUILD_DIR)/$(1) && CLANG_PROXY_FOCUS=dparser \
+		CLANG_PROXY_ARGS="$(4)" CLANG_PROXY_VAR="$(5)" \
+		time -o $(PWD)/$(1)/time.log ninja $(3) -j $(shell nproc) -v > $(PWD)/$(1)/build.log \
+		|| { echo "*** build failed ***"; exit 1 ; }
 	echo "---------$(1)---------" >> ../dparser.raw
-	cat /tmp/count-push-pop.txt >> ../dparser.raw
-	touch $(1)
+	cat $(PWD)/$(1).count-push-pop >> ../dparser.raw 
+	echo "---------$(1)---------" >> ../dparser.output
+	cat $(PWD)/$(1).count-push-pop | $(COUNTSUM) >> ../dparser.output 
 endef
 
+additional_original_flags =  $(if $(findstring thin,$(1)),-DLLVM_ENABLE_LTO=Thin) \
+							 $(if $(findstring full,$(1)),-DLLVM_ENABLE_LTO=Full) \
+							  -DLLVM_PROFDATA_FILE=$(PWD)/instrumented.profdata
 
-instrumented: dparser-master
-	$(call build,$@,$(call gen_build_flags,-fprofile-generate=$(INSTRUMENTED_PROF),-fprofile-generate=$(INSTRUMENTED_PROF)))
+$(eval $(call gen_pgo_targets,thin))
+$(eval $(call gen_pgo_targets,full))
 
-pgolto: $(INSTRUMENTED_PROF)/dparser.profdata
-	$(call build,$@,$(call gen_build_flags,-flto=thin -fprofile-use=$(INSTRUMENTED_PROF)/dparser.profdata,-flto=thin -fprofile-use=$(INSTRUMENTED_PROF)/dparser.profdata))
+debug-makefile:
+	$(warning $(call gen_pgo_targets,full))
 
-pgolto-ipra: $(INSTRUMENTED_PROF)/dparser.profdata
-	$(call build,$@,$(call gen_build_flags,-flto=thin -fprofile-use=$(INSTRUMENTED_PROF)/dparser.profdata,-flto=thin -fprofile-use=$(INSTRUMENTED_PROF)/dparser.profdata -Wl$(COMMA)-mllvm -Wl$(COMMA)-enable-ipra -Wl$(COMMA)-Bsymbolic-non-weak-functions))
+instrumented: | $(SOURCE)/.complete
+	$(call build_clang,$@,-DLLVM_BUILD_INSTRUMENTED=ON $(call gen_build_flags_ins),install)
+	touch $@
 
-pgolto-fdoipra: $(INSTRUMENTED_PROF)/dparser.profdata
-	$(call build,$@,$(call gen_build_flags,-flto=thin -fprofile-use=$(INSTRUMENTED_PROF)/dparser.profdata,-flto=thin -fprofile-use=$(INSTRUMENTED_PROF)/dparser.profdata -Wl$(COMMA)-mllvm -Wl$(COMMA)-fdo-ipra -Wl$(COMMA)-Bsymbolic-non-weak-functions))
+instrumented.profdata: instrumented
+	rm -rf $(INSTRUMENTED_PROF)
+	$(call switch_binary,instrumented)
+	$(call clang_bench,$(INSTALL_DIR)/bin)
+	cd $(BENCH_DIR) && ./perf_commands.sh
+	cd $(INSTRUMENTED_PROF) && $(LLVM_BIN)/llvm-profdata merge -output=$(PWD)/instrumented.profdata * && rm *.profraw
+	rm -rf $(INSTALL_DIR)
 
-pgolto-full: $(INSTRUMENTED_PROF)/dparser.profdata
-	$(call build,$@,$(call gen_build_flags,-flto=full -fprofile-use=$(INSTRUMENTED_PROF)/dparser.profdata,-flto=full -fprofile-use=$(INSTRUMENTED_PROF)/dparser.profdata))
-
-pgolto-full-ipra: $(INSTRUMENTED_PROF)/dparser.profdata
-	$(call build,$@,$(call gen_build_flags,-flto=full -fprofile-use=$(INSTRUMENTED_PROF)/dparser.profdata,-flto=full -fprofile-use=$(INSTRUMENTED_PROF)/dparser.profdata -Wl$(COMMA)-mllvm -Wl$(COMMA)-enable-ipra -Wl$(COMMA)-Bsymbolic-non-weak-functions))
-
-pgolto-full-fdoipra: $(INSTRUMENTED_PROF)/dparser.profdata
-	$(call build,$@,$(call gen_build_flags,-flto=full -fprofile-use=$(INSTRUMENTED_PROF)/dparser.profdata,-flto=full -fprofile-use=$(INSTRUMENTED_PROF)/dparser.profdata -Wl$(COMMA)-mllvm -Wl$(COMMA)-fdo-ipra -Wl$(COMMA)-Bsymbolic-non-weak-functions))
-
-$(INSTRUMENTED_PROF)/dparser.profdata:  instrumented
-	$(call run_bench,instrumented,$(PWD)/build.dir/instrumented/dparser)
-	cd build.dir/instrumented && bash $(mkfile_path)scripts.sh
-	cd $(INSTRUMENTED_PROF) && $(LLVM_BIN)/llvm-profdata merge -output=dparser.profdata *
 
 %.bench: %
-	cd build.dir/$(basename $@) && perf stat -o $(basename $@).bench -r5 -- taskset -c 1 bash $(mkfile_path)scripts.sh
+	cd build.dir/$(basename $@) && perf stat -o $(basename $@).bench -r5 -- $(TASKSET) bash $(mkfile_path)scripts.sh
 
-dparser-master:
-	wget https://github.com/jplevyak/dparser/archive/refs/heads/master.zip && unzip ./master.zip && rm ./master.zip
+dparser-master: $(SOURCE)/.complete
+
+master.zip:
+	wget https://github.com/jplevyak/dparser/archive/refs/heads/master.zip
+
+$(SOURCE)/.complete: master.zip
+	mkdir -p $(BUILD_PATH)/$(BENCHMARK)
+	cd $(BUILD_PATH)/$(BENCHMARK) && unzip -q -o $(PWD)/$<
+	touch $@

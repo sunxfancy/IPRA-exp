@@ -1,0 +1,2 @@
+-mllvm -fdo-ipra -mllvm -fdoipra-both-hot=false -mllvm -fdoipra-ch=1 -mllvm -fdoipra-hc=1
+-Wl,-mllvm -Wl,-fdo-ipra -Wl,-mllvm -Wl,-fdoipra-both-hot=false -Wl,-mllvm -Wl,-fdoipra-ch=1 -Wl,-mllvm -Wl,-fdoipra-hc=1

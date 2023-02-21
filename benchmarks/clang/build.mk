@@ -1,171 +1,173 @@
 mkfile_path := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
-PWD := $(shell pwd)
+BENCHMARK=clang
+include $(mkfile_path)../common.mk
+
 CLANG_VERSION=llvmorg-14.0.6
-LLVM = $(PWD)/llvm-project-$(CLANG_VERSION)/llvm
-INSTRUMENTED_PROF=$(PWD)/build.dir/instrumented/profiles
+SOURCE = $(BUILD_PATH)/$(BENCHMARK)/llvm-project-$(CLANG_VERSION)/llvm
 
-# pgolto pgolto-ipra pgolto-fdoipra
-# pgolto.bench pgolto-ipra.bench pgolto-fdoipra.bench
-all:   pgolto-full pgolto-full-ipra pgolto-full-fdoipra pgolto-full-fdoipra2 pgolto-full-fdoipra3 pgolto-full-sfdoipra pgolto-full-sfdoipra2 pgolto-full-sfdoipra3
-bench:   pgolto-full.bench pgolto-full-ipra.bench pgolto-full-fdoipra.bench pgolto-full-fdoipra2.bench pgolto-full-fdoipra3.bench pgolto-full-sfdoipra.bench pgolto-full-sfdoipra2.bench pgolto-full-sfdoipra3.bench
-common_compiler_flags := -v -fuse-ld=lld -fPIC -fno-optimize-sibling-calls -mllvm -fast-isel=false -fsplit-machine-functions
-common_linker_flags := -v -fuse-ld=lld -fno-optimize-sibling-calls -Wl,-mllvm -Wl,-fast-isel=false -fsplit-machine-functions
-gen_compiler_flags = -DCMAKE_C_FLAGS=$(1) -DCMAKE_CXX_FLAGS=$(1)
-gen_linker_flags   = -DCMAKE_EXE_LINKER_FLAGS=$(1) -DCMAKE_SHARED_LINKER_FLAGS=$(1) -DCMAKE_MODULE_LINKER_FLAGS=$(1)
-gen_build_flags = $(call gen_compiler_flags,"$(common_compiler_flags) $(1)") $(call gen_linker_flags,"$(common_linker_flags) $(2)")
-COMMA := ,
+common_compiler_flags += -fPIC
 
+CLANG_NAME=clang-14
+
+MAIN_BIN = bin/$(CLANG_NAME)
+BUILD_ACTION=build_clang
+BUILD_TARGET=clang lld
+INSTALL_TARGET=install
+
+define switch_binary
+	if [ ! -d "$(INSTALL_DIR)/bin" ]; then \
+		mkdir -p $(BUILD_PATH)/$(BENCHMARK) && cp -r $(PWD)/install.dir $(BUILD_PATH)/$(BENCHMARK)/; fi
+	rm -f $(INSTALL_DIR)/$(MAIN_BIN)
+	rm -f $(INSTALL_DIR)/bin/lld
+	cp $(PWD)/$(1)/$(MAIN_BIN)$(2) $(INSTALL_DIR)/$(MAIN_BIN)
+	cp $(PWD)/$(1)/bin/lld $(INSTALL_DIR)/bin/lld
+endef
 
 define build_clang
-	rm -f /tmp/count-push-pop.txt 
-	touch /tmp/count-push-pop.txt
-	mkdir -p build.dir/$(1)
-	mkdir -p install.dir/$(1)
-	cd build.dir/$(1) && cmake -G Ninja $(LLVM) \
+	if [ -d "$(PWD)/$(1)" ]; then rm -rf $(PWD)/$(1); fi
+	mkdir -p $(BUILD_DIR)/$(1)
+	mkdir -p $(PWD)/$(1)/bin
+	mkdir -p $(INSTALL_DIR)
+	$(call clean_count_push_pop,$(1))
+	cd $(BUILD_DIR)/$(1) && cmake -G Ninja $(SOURCE) \
 		-DCMAKE_BUILD_TYPE=Release \
 		-DLLVM_OPTIMIZED_TABLEGEN=ON \
 		-DLLVM_TARGETS_TO_BUILD="X86" \
 		-DLLVM_ENABLE_RTTI=OFF \
 		-DBUILD_SHARED_LIBS=OFF \
-		-DLLVM_INCLUDE_TESTS=ON \
-		-DLLVM_BUILD_TESTS=ON \
-		-DLLVM_PARALLEL_LINK_JOBS=64 \
+		-DLLVM_INCLUDE_TESTS=OFF \
+		-DLLVM_BUILD_TESTS=OFF \
+		-DLLVM_PARALLEL_LINK_JOBS=$(shell nproc) \
 		-DCMAKE_C_COMPILER=$(NCC) \
 		-DCMAKE_CXX_COMPILER=$(NCXX) \
-		-DLLVM_ENABLE_PROJECTS="clang;lld" \
+		-DLLVM_ENABLE_PROJECTS="clang;lld;compiler-rt" \
 		-DLLVM_USE_LINKER=lld \
-		-DCMAKE_INSTALL_PREFIX=$(PWD)/install.dir/$(1) \
-		$(2)
-	cd build.dir/$(1) && CLANG_PROXY_FOCUS=clang-14 CLANG_PROXY_ARGS="-Wl,-mllvm -Wl,-count-push-pop" time -o time.log ninja install -j $(shell nproc) -v > build.log
-	echo "---------$(1)---------" >> ../clang.output
-	cat /tmp/count-push-pop.txt | $(COUNTSUM) >> ../clang.output 
-	echo "---------$(1)---------" >> ../clang.raw
-	cat /tmp/count-push-pop.txt >> ../clang.raw 
-	touch $(1)
+		-DCMAKE_INSTALL_PREFIX=$(INSTALL_DIR) \
+		$(2) > $(PWD)/$(1)/conf.log
+	cd $(BUILD_DIR)/$(1) && CLANG_PROXY_FOCUS=$(CLANG_NAME) \
+		CLANG_PROXY_ARGS="$(4)" CLANG_PROXY_VAR="$(5)" \
+		time -o $(PWD)/$(1)/time.log ninja $(3) -j $(shell nproc) -v > $(PWD)/$(1)/build.log \
+		|| { echo "*** build failed ***"; exit 1 ; }
+	if [ ! -d "$(PWD)/install.dir" ]; then \
+		mkdir -p $(INSTALL_DIR) && cd $(BUILD_DIR)/$(1) && ninja $(INSTALL_TARGET) -v >> $(PWD)/$(1)/build.log; \
+		if [ "$(1)" != "instrumented" ]; then \
+			mv $(INSTALL_DIR) $(PWD)/install.dir; \
+		fi; \
+	fi
+
+	cp $(BUILD_DIR)/$(1)/bin/lld $(PWD)/$(1)/bin/lld
+	$(call mv_binary,$(1))
+	$(call switch_binary,$(1))
+	$(call clang_bench,$(INSTALL_DIR)/bin)
 endef
 
 define clang_bench
-	mkdir -p build.dir/clangbench/$(1)
-	cd build.dir/clangbench/$(1) && cmake -G Ninja $(LLVM) \
-		-DCMAKE_BUILD_TYPE=RelWithDebInfo \
-		-DLLVM_TARGETS_TO_BUILD=X86 \
-		-DLLVM_OPTIMIZED_TABLEGEN=On \
-		-DCMAKE_C_COMPILER=$(2)/clang \
-		-DCMAKE_CXX_COMPILER=$(2)/clang++ \
-		-DLLVM_ENABLE_PROJECTS="clang" 
-	cd build.dir/clangbench/$(1) && (ninja -t commands | head -100 > $(PWD)/build.dir/clangbench/$(1)/perf_commands.sh)
-	cd build.dir/clangbench/$(1) && chmod +x ./perf_commands.sh
+	if [ ! -d "$(BENCH_DIR)" ]; then \
+		mkdir -p $(BENCH_DIR) && \
+		cd $(BENCH_DIR) && cmake -G Ninja $(SOURCE) \
+			-DCMAKE_BUILD_TYPE=RelWithDebInfo \
+			-DLLVM_TARGETS_TO_BUILD=X86 \
+			-DLLVM_OPTIMIZED_TABLEGEN=On \
+			-DCMAKE_C_COMPILER=$(1)/clang \
+			-DCMAKE_CXX_COMPILER=$(1)/clang++ \
+			-DLLVM_ENABLE_PROJECTS="clang" \
+		&& (ninja -t commands | head -100 > perf_commands.sh) \
+		&& chmod +x ./perf_commands.sh; \
+	fi
+endef
+
+# -DCMAKE_C_FLAGS="-I$(INSTALL_DIR)/lib/clang/15.0.3/include" \
+# -DCMAKE_CXX_FLAGS="-I$(INSTALL_DIR)/lib/clang/15.0.3/include" \
+
+
+define copy_to_server
+	mkdir -p $(BENCH_DIR) && cd $(BENCH_DIR) \
+	   && $(RUN_FOR_REMOTE) sed 's/\/[^ ]*IPRA-exp/\/tmp\/IPRA-exp/g; s/^:.*://g;' ./perf_commands.sh > ./perf_commands-copy.sh && \
+				sed ' s/\.cpp\.o -c/\.cpp\.i -E/g; s/^:.*://g;' ./perf_commands.sh > ./preprocess.sh &&  \
+				 $(RUN_FOR_REMOTE) $(INSTALL_PATH)/process_cmd < ./perf_commands-copy.sh > ./perf_commands_remote.sh && \
+				 $(RUN_FOR_REMOTE) bash ./preprocess.sh
+	$(COPY_TO_REMOTE) $(BENCH_DIR)
+	$(COPY_TO_REMOTE) $(PWD)/$(1)/$(MAIN_BIN)$(2)
+	$(COPY_TO_REMOTE) $(INSTALL_DIR)/$(MAIN_BIN)
+	$(COPY_TO_REMOTE) $(INSTALL_DIR)/bin/clang
+	$(COPY_TO_REMOTE) $(INSTALL_DIR)/bin/clang++
+	$(COPY_TO_REMOTE) $(INSTALL_PATH)/sub
+endef
+
+
+define gen_perfdata
+
+$(1)$(2).perfdata: $(1)/.complete $(SOURCE)/.complete
+	$(call switch_binary,$(1),$(2))
+	$(call clang_bench,$(INSTALL_DIR)/bin)
+	mkdir -p $(BENCH_DIR) && cd $(BENCH_DIR) && \
+		$(PERF) record -e cycles:u -j any,u -o ../$$@ -- $(TASKSET) bash ./perf_commands.sh
+	$(COPY_BACK) $(PWD)/$$@
+	$(RUN_ON_REMOTE) rm -rf $(BENCH_DIR)
+	rm -rf $$@ 
+	mv $(BUILD_PATH)/$(BENCHMARK)/$$@ $$@
+
+$(1)$(2).regprof2: $(1)/.complete $(SOURCE)/.complete
+	$(call switch_binary,$(1),$(2))
+	$(call clang_bench,$(INSTALL_DIR)/bin)
+	rm -rf $(PWD)/$$@.raw
+	mkdir -p $(BENCH_DIR) && cd $(BENCH_DIR) && \
+		LLVM_IRPP_PROFILE="$(PWD)/$$@.raw" $(DRRUN) bash ./perf_commands.sh
+	cat $(PWD)/$$@.raw | $(COUNTSUM) > $(PWD)/$$@
+
+$(1)$(2).regprof3: $(1).profbuild/.complete $(SOURCE)/.complete
+	$(call switch_binary,$(1).profbuild,$(2))
+	$(call clang_bench,$(INSTALL_DIR)/bin)
+	rm -rf $(PWD)/$$@.raw
+	mkdir -p $(BENCH_DIR) && cd $(BENCH_DIR) && \
+		LLVM_IRPP_PROFILE="$(PWD)/$$@.raw" bash ./perf_commands.sh 
+	cat $(PWD)/$$@.raw | $(COUNTSUM) > $(PWD)/$$@
+
+endef
+
+define gen_bench
+
+$(1)$(2).bench: $(1)/.complete
+	$(call switch_binary,$(1),$(2))
+	$(call clang_bench,$(INSTALL_DIR)/bin)
+	$(call copy_to_server,$(1),$(2))
+	mkdir -p $(BENCH_DIR) && cd $(BENCH_DIR) && \
+		$(PERF) stat $(PERF_EVENTS) -o ../$$@ -r5 -- $(TASKSET) bash ./perf_commands.sh
+	$(COPY_BACK) $(PWD)/$$@
+	$(RUN_ON_REMOTE) rm -rf $(BENCH_DIR)
+	rm -rf $$@
+	mv $(BUILD_PATH)/$(BENCHMARK)/$$@ $$@
+
 endef 
 
+additional_original_flags =  $(if $(findstring thin,$(1)),-DLLVM_ENABLE_LTO=Thin) \
+							 $(if $(findstring full,$(1)),-DLLVM_ENABLE_LTO=Full) \
+							  -DLLVM_PROFDATA_FILE=$(PWD)/instrumented.profdata
+
+$(eval $(call gen_pgo_targets,thin))
+$(eval $(call gen_pgo_targets,full))
+
+debug-makefile:
+	$(warning $(call gen_pgo_targets,full))
+
+instrumented: instrumented/.complete
+instrumented/.complete: | $(SOURCE)/.complete
+	$(call build_clang,instrumented,-DLLVM_BUILD_INSTRUMENTED=ON $(call gen_build_flags_ins),$(INSTALL_TARGET))
+	touch $@
+
+instrumented.profdata: instrumented/.complete
+	rm -rf $(INSTRUMENTED_PROF)
+	$(call switch_binary,instrumented)
+	$(call clang_bench,$(INSTALL_DIR)/bin)
+	cd $(BENCH_DIR) && ./perf_commands.sh
+	cd $(INSTRUMENTED_PROF) && $(LLVM_BIN)/llvm-profdata merge -output=$(PWD)/instrumented.profdata * && rm *.profraw
+	rm -rf $(INSTALL_DIR)
 
 
-instrumented: llvm-project-$(CLANG_VERSION)
-	$(call build_clang,$@,-DLLVM_BUILD_INSTRUMENTED=ON $(call gen_build_flags,,))
+$(CLANG_VERSION).zip: 
+	wget -q https://github.com/llvm/llvm-project/archive/refs/tags/$(CLANG_VERSION).zip
 
-pgo: $(INSTRUMENTED_PROF)/clang.profdata
-	$(call build_clang,$@,$(call gen_build_flags,,) -DLLVM_PROFDATA_FILE=$(INSTRUMENTED_PROF)/clang.profdata)
-
-pgolto: $(INSTRUMENTED_PROF)/clang.profdata
-	$(call build_clang,$@,-DLLVM_ENABLE_LTO=Thin $(call gen_build_flags,,) -DLLVM_PROFDATA_FILE=$(INSTRUMENTED_PROF)/clang.profdata)
-
-pgolto-ipra: $(INSTRUMENTED_PROF)/clang.profdata
-	$(call build_clang,$@,-DLLVM_ENABLE_LTO=Thin $(call gen_build_flags,,-Wl$(COMMA)-mllvm -Wl$(COMMA)-enable-ipra -Wl$(COMMA)-Bsymbolic-non-weak-functions) -DLLVM_PROFDATA_FILE=$(INSTRUMENTED_PROF)/clang.profdata)
-
-pgolto-full-ipra: $(INSTRUMENTED_PROF)/clang.profdata
-	$(call build_clang,$@,-DLLVM_ENABLE_LTO=Full $(call gen_build_flags,,-Wl$(COMMA)-mllvm -Wl$(COMMA)-enable-ipra -Wl$(COMMA)-Bsymbolic-non-weak-functions) -DLLVM_PROFDATA_FILE=$(INSTRUMENTED_PROF)/clang.profdata)
-
-pgolto-full: $(INSTRUMENTED_PROF)/clang.profdata
-	$(call build_clang,$@,-DLLVM_ENABLE_LTO=Full $(call gen_build_flags,,-Wl$(COMMA)-Bsymbolic-non-weak-functions) -DLLVM_PROFDATA_FILE=$(INSTRUMENTED_PROF)/clang.profdata)
-
-pgolto-full-fdoipra-may-crash: $(INSTRUMENTED_PROF)/clang.profdata
-	$(call build_clang,$@,-DLLVM_ENABLE_LTO=Full $(call gen_build_flags,,-Wl$(COMMA)-mllvm -Wl$(COMMA)-fdo-ipra -Wl$(COMMA)-Bsymbolic-non-weak-functions) -DLLVM_PROFDATA_FILE=$(INSTRUMENTED_PROF)/clang.profdata)
-
-pgo-fdoipra: $(INSTRUMENTED_PROF)/clang.profdata
-	$(call build_clang,$@,$(call gen_build_flags,,-Wl$(COMMA)-mllvm -Wl$(COMMA)-fdo-ipra -Wl$(COMMA)-Bsymbolic-non-weak-functions) -DLLVM_PROFDATA_FILE=$(INSTRUMENTED_PROF)/clang.profdata)
-
-pgolto-fdoipra: $(INSTRUMENTED_PROF)/clang.profdata
-	$(call build_clang,$@,-DLLVM_ENABLE_LTO=Thin $(call gen_build_flags,,-Wl$(COMMA)-mllvm -Wl$(COMMA)-fdo-ipra -Wl$(COMMA)-Bsymbolic-non-weak-functions) -DLLVM_PROFDATA_FILE=$(INSTRUMENTED_PROF)/clang.profdata)
-
-pgolto-full-fdoipra: $(INSTRUMENTED_PROF)/clang.profdata
-	$(call build_clang,$@,-DLLVM_ENABLE_LTO=Full $(call gen_build_flags,,-Wl$(COMMA)-mllvm -Wl$(COMMA)-fdo-ipra -Wl$(COMMA)-Bsymbolic-non-weak-functions) -DLLVM_PROFDATA_FILE=$(INSTRUMENTED_PROF)/clang.profdata)
-
-pgolto-full-fdoipra2: $(INSTRUMENTED_PROF)/clang.profdata
-	$(call build_clang,$@,-DLLVM_ENABLE_LTO=Full $(call gen_build_flags,,-Wl$(COMMA)-mllvm -Wl$(COMMA)-fdo-ipra -Wl$(COMMA)-mllvm -Wl$(COMMA)-fdoipra-ch=1 -Wl$(COMMA)-Bsymbolic-non-weak-functions) -DLLVM_PROFDATA_FILE=$(INSTRUMENTED_PROF)/clang.profdata)
-
-pgolto-full-fdoipra3: $(INSTRUMENTED_PROF)/clang.profdata
-	$(call build_clang,$@,-DLLVM_ENABLE_LTO=Full $(call gen_build_flags,,-Wl$(COMMA)-mllvm -Wl$(COMMA)-fdo-ipra -Wl$(COMMA)-mllvm -Wl$(COMMA)-fdoipra-ch=1 -Wl$(COMMA)-mllvm -Wl$(COMMA)-fdoipra-hc=1 -Wl$(COMMA)-Bsymbolic-non-weak-functions) -DLLVM_PROFDATA_FILE=$(INSTRUMENTED_PROF)/clang.profdata)
-
-pgolto-full-sfdoipra: $(INSTRUMENTED_PROF)/clang.profdata
-	$(call build_clang,$@,-DLLVM_ENABLE_LTO=Full $(call gen_build_flags,,-Wl$(COMMA)-mllvm -Wl$(COMMA)-fdo-ipra -Wl$(COMMA)-mllvm -Wl$(COMMA)-fdoipra-both-hot=false -Wl$(COMMA)-Bsymbolic-non-weak-functions) -DLLVM_PROFDATA_FILE=$(INSTRUMENTED_PROF)/clang.profdata)
-
-pgolto-full-sfdoipra2: $(INSTRUMENTED_PROF)/clang.profdata
-	$(call build_clang,$@,-DLLVM_ENABLE_LTO=Full $(call gen_build_flags,,-Wl$(COMMA)-mllvm -Wl$(COMMA)-fdo-ipra -Wl$(COMMA)-mllvm -Wl$(COMMA)-fdoipra-ch=1 -Wl$(COMMA)-mllvm -Wl$(COMMA)-fdoipra-both-hot=false -Wl$(COMMA)-Bsymbolic-non-weak-functions) -DLLVM_PROFDATA_FILE=$(INSTRUMENTED_PROF)/clang.profdata)
-
-pgolto-full-sfdoipra3: $(INSTRUMENTED_PROF)/clang.profdata
-	$(call build_clang,$@,-DLLVM_ENABLE_LTO=Full $(call gen_build_flags,,-Wl$(COMMA)-mllvm -Wl$(COMMA)-fdo-ipra -Wl$(COMMA)-mllvm -Wl$(COMMA)-fdoipra-ch=1 -Wl$(COMMA)-mllvm -Wl$(COMMA)-fdoipra-hc=1 -Wl$(COMMA)-mllvm -Wl$(COMMA)-fdoipra-both-hot=false -Wl$(COMMA)-Bsymbolic-non-weak-functions) -DLLVM_PROFDATA_FILE=$(INSTRUMENTED_PROF)/clang.profdata)
-
-
-pgolto-ipra-fdoipra: $(INSTRUMENTED_PROF)/clang.profdata
-	$(call build_clang,$@,-DLLVM_ENABLE_LTO=Thin $(call gen_build_flags,,-Wl$(COMMA)-mllvm -Wl$(COMMA)-fdo-ipra -Wl$(COMMA)-mllvm -Wl$(COMMA)-enable-ipra -Wl$(COMMA)-Bsymbolic-non-weak-functions) -DLLVM_PROFDAT_FILE=$(INSTRUMENTED_PROF)/clang.profdata)
-
-pgolto-full-ipra-fdoipra: $(INSTRUMENTED_PROF)/clang.profdata
-	$(call build_clang,$@,-DLLVM_ENABLE_LTO=Full $(call gen_build_flags,,-Wl$(COMMA)-mllvm -Wl$(COMMA)-fdo-ipra -Wl$(COMMA)-mllvm -Wl$(COMMA)-enable-ipra -Wl$(COMMA)-Bsymbolic-non-weak-functions) -DLLVM_PROFDAT_FILE=$(INSTRUMENTED_PROF)/clang.profdata)
-
-$(INSTRUMENTED_PROF)/clang.profdata: instrumented
-	$(call clang_bench,instrumented,$(PWD)/install.dir/instrumented/bin)
-	cd build.dir/clangbench/instrumented && ./perf_commands.sh
-	cd $(INSTRUMENTED_PROF) && $(LLVM_BIN)/llvm-profdata merge -output=clang.profdata *
-
-%.bench: % 
-	$(call clang_bench,$(basename $@),$(PWD)/install.dir/$(basename $@)/bin)
-	cd build.dir/clangbench/$(basename $@) && $(RUN_FOR_REMOTE) sed 's/\/[^ ]*IPRA-exp/\/tmp\/IPRA-exp/g; s/^:.*://g;' ./perf_commands.sh > ./perf_commands-copy.sh && \
-				sed ' s/\.cpp\.o -c/\.cpp\.i -E/g; s/^:.*://g;' ./perf_commands.sh > ./preprocess.sh &&  \
-				 $(RUN_FOR_REMOTE) $(LLVM_ROOT_PATH)/../process_cmd < ./perf_commands-copy.sh > ./perf_commands.sh && \
-				 $(RUN_FOR_REMOTE) bash ./preprocess.sh
-	
-# $(COPY_TO_REMOTE) build/benchmarks/clang/llvm-project-llvmorg-14.0.6/
-	$(COPY_TO_REMOTE) build/benchmarks/clang/build.dir/clangbench/$(basename $@)/
-	$(COPY_TO_REMOTE) build/benchmarks/clang/install.dir/$(basename $@)/
-	cd build.dir/clangbench/$(basename $@) && $(PERF) stat $(PERF_EVENTS) -o $(basename $@).bench -r5 -- taskset -c 1 bash ./perf_commands.sh
-	$(COPY_BACK) $(PWD)/build.dir/clangbench/$(basename $@)/$(basename $@).bench
-	$(RUN_ON_REMOTE) rm -rf /tmp/IPRA-exp/*
-
-%.test-copy-back:
-	$(COPY_BACK) $(PWD)/build.dir/clangbench/$(basename $@)/$(basename $@).bench
-
-llvm-project-$(CLANG_VERSION):
-	wget https://github.com/llvm/llvm-project/archive/refs/tags/$(CLANG_VERSION).zip && unzip $(CLANG_VERSION) && rm -f $(CLANG_VERSION).zip
-
-
-%.check:
-	mkdir -p check
-	install.dir/$(basename $@)/bin/clang++ -g -O3 $(mkfile_path)test.cpp -o check/test
-	install.dir/$(basename $@)/bin/clang++ -g -O3 $(mkfile_path)atomic.cpp -o check/atomic
-	./check/test
-	./check/atomic
-
-%.checkgdb:
-	lldb -- install.dir/$(basename $@)/bin/clang-14 -cc1 -triple x86_64-unknown-linux-gnu -emit-obj --mrelax-relocations -disable-free -clear-ast-before-backend -disable-llvm-verifier -discard-value-names -main-file-name atomic.cpp -mrelocation-model static -mframe-pointer=none -fmath-errno -ffp-contract=on -fno-rounding-math -mconstructor-aliases -funwind-tables=2 -target-cpu x86-64 -tune-cpu generic -mllvm -treat-scalable-fixed-error-as-warning -debug-info-kind=constructor -dwarf-version=5 -debugger-tuning=gdb -fcoverage-compilation-dir=/usr/local/google/home/xiaofans/workspace/IPRA-exp/build/benchmarks/clang -resource-dir /usr/local/google/home/xiaofans/workspace/IPRA-exp/build/benchmarks/clang/install.dir/pgolto-full-fdoipra/lib/clang/14.0.6 -internal-isystem /usr/lib/gcc/x86_64-linux-gnu/11/../../../../include/c++/11 -internal-isystem /usr/lib/gcc/x86_64-linux-gnu/11/../../../../include/x86_64-linux-gnu/c++/11 -internal-isystem /usr/lib/gcc/x86_64-linux-gnu/11/../../../../include/c++/11/backward -internal-isystem /usr/local/google/home/xiaofans/workspace/IPRA-exp/build/benchmarks/clang/install.dir/pgolto-full-fdoipra/lib/clang/14.0.6/include -internal-isystem /usr/local/include -internal-isystem /usr/lib/gcc/x86_64-linux-gnu/11/../../../../x86_64-linux-gnu/include -internal-externc-isystem /usr/include/x86_64-linux-gnu -internal-externc-isystem /include -internal-externc-isystem /usr/include -O3 -fdeprecated-macro -fdebug-compilation-dir=/usr/local/google/home/xiaofans/workspace/IPRA-exp/build/benchmarks/clang -ferror-limit 19 -fgnuc-version=4.2.1 -fcxx-exceptions -fexceptions -fcolor-diagnostics -vectorize-loops -vectorize-slp -faddrsig -D__GCC_HAVE_DWARF2_CFI_ASM=1 -o /tmp/atomic-fe8433.o -x c++ /usr/local/google/home/xiaofans/workspace/IPRA-exp/benchmarks/clang/atomic.cpp
-
-%.dbg:
-	cd /usr/local/google/home/xiaofans/workspace/IPRA-exp/build/benchmarks/clang/build.dir/pgolto-full-fdoipra2 && lldb -- /usr/local/google/home/xiaofans/workspace/IPRA-exp/build/benchmarks/clang/build.dir/$(basename $@)/bin/clang-tblgen -gen-clang-attr-classes -I /usr/local/google/home/xiaofans/workspace/IPRA-exp/build/benchmarks/clang/llvm-project-llvmorg-14.0.6/clang/include/clang/AST -I/usr/local/google/home/xiaofans/workspace/IPRA-exp/build/benchmarks/clang/llvm-project-llvmorg-14.0.6/clang/include -I/usr/local/google/home/xiaofans/workspace/IPRA-exp/build/benchmarks/clang/build.dir/pgolto-full-fdoipra2/tools/clang/include -I/usr/local/google/home/xiaofans/workspace/IPRA-exp/build/benchmarks/clang/build.dir/pgolto-full-fdoipra2/include -I/usr/local/google/home/xiaofans/workspace/IPRA-exp/build/benchmarks/clang/llvm-project-llvmorg-14.0.6/llvm/include /usr/local/google/home/xiaofans/workspace/IPRA-exp/build/benchmarks/clang/llvm-project-llvmorg-14.0.6/clang/include/clang/AST/../Basic/Attr.td --write-if-changed -o tools/clang/include/clang/AST/Attrs.inc -d tools/clang/include/clang/AST/Attrs.inc.d
-
-check-gdb:
-	gdb -x $(mkfile_path)gdbscript --args /usr/local/google/home/xiaofans/workspace/IPRA-exp/build/benchmarks/clang/install.dir/pgolto-full-fdoipra/bin/clang-14 -cc1 -triple x86_64-unknown-linux-gnu -emit-obj --mrelax-relocations -disable-free -clear-ast-before-backend -disable-llvm-verifier -discard-value-names -main-file-name test.cpp -mrelocation-model static -mframe-pointer=none -fmath-errno -ffp-contract=on -fno-rounding-math -mconstructor-aliases -funwind-tables=2 -target-cpu x86-64 -tune-cpu generic -mllvm -treat-scalable-fixed-error-as-warning -debug-info-kind=constructor -dwarf-version=5 -debugger-tuning=gdb -fcoverage-compilation-dir=/usr/local/google/home/xiaofans/workspace/IPRA-exp/build/benchmarks/clang -resource-dir /usr/local/google/home/xiaofans/workspace/IPRA-exp/build/benchmarks/clang/install.dir/pgolto-full-fdoipra/lib/clang/14.0.6 -internal-isystem /usr/lib/gcc/x86_64-linux-gnu/11/../../../../include/c++/11 -internal-isystem /usr/lib/gcc/x86_64-linux-gnu/11/../../../../include/x86_64-linux-gnu/c++/11 -internal-isystem /usr/lib/gcc/x86_64-linux-gnu/11/../../../../include/c++/11/backward -internal-isystem /usr/local/google/home/xiaofans/workspace/IPRA-exp/build/benchmarks/clang/install.dir/pgolto-full-fdoipra/lib/clang/14.0.6/include -internal-isystem /usr/local/include -internal-isystem /usr/lib/gcc/x86_64-linux-gnu/11/../../../../x86_64-linux-gnu/include -internal-externc-isystem /usr/include/x86_64-linux-gnu -internal-externc-isystem /include -internal-externc-isystem /usr/include -O3 -fdeprecated-macro -fdebug-compilation-dir=/usr/local/google/home/xiaofans/workspace/IPRA-exp/build/benchmarks/clang -ferror-limit 19 -fmessage-length=454 -fgnuc-version=4.2.1 -fcxx-exceptions -fexceptions -fcolor-diagnostics -vectorize-loops -vectorize-slp -faddrsig -D__GCC_HAVE_DWARF2_CFI_ASM=1 -o /tmp/test-4c9ef2.o -x c++ /usr/local/google/home/xiaofans/workspace/IPRA-exp/benchmarks/clang/test.cpp
-
-check-compare:
-	@tmux new-session -d /bin/sh -c "lldb -s $(mkfile_path)gdbscript -- /usr/local/google/home/xiaofans/workspace/IPRA-exp/build/benchmarks/clang/install.dir/pgolto-full-fdoipra/bin/clang-14 -cc1 -triple x86_64-unknown-linux-gnu -emit-obj --mrelax-relocations -disable-free -clear-ast-before-backend -disable-llvm-verifier -discard-value-names -main-file-name test.cpp -mrelocation-model static -mframe-pointer=none -fmath-errno -ffp-contract=on -fno-rounding-math -mconstructor-aliases -funwind-tables=2 -target-cpu x86-64 -tune-cpu generic -mllvm -treat-scalable-fixed-error-as-warning -debug-info-kind=constructor -dwarf-version=5 -debugger-tuning=gdb -fcoverage-compilation-dir=/usr/local/google/home/xiaofans/workspace/IPRA-exp/build/benchmarks/clang -resource-dir /usr/local/google/home/xiaofans/workspace/IPRA-exp/build/benchmarks/clang/install.dir/pgolto-full-fdoipra/lib/clang/14.0.6 -internal-isystem /usr/lib/gcc/x86_64-linux-gnu/11/../../../../include/c++/11 -internal-isystem /usr/lib/gcc/x86_64-linux-gnu/11/../../../../include/x86_64-linux-gnu/c++/11 -internal-isystem /usr/lib/gcc/x86_64-linux-gnu/11/../../../../include/c++/11/backward -internal-isystem /usr/local/google/home/xiaofans/workspace/IPRA-exp/build/benchmarks/clang/install.dir/pgolto-full-fdoipra/lib/clang/14.0.6/include -internal-isystem /usr/local/include -internal-isystem /usr/lib/gcc/x86_64-linux-gnu/11/../../../../x86_64-linux-gnu/include -internal-externc-isystem /usr/include/x86_64-linux-gnu -internal-externc-isystem /include -internal-externc-isystem /usr/include -O3 -fdeprecated-macro -fdebug-compilation-dir=/usr/local/google/home/xiaofans/workspace/IPRA-exp/build/benchmarks/clang -ferror-limit 19 -fmessage-length=454 -fgnuc-version=4.2.1 -fcxx-exceptions -fexceptions -fcolor-diagnostics -vectorize-loops -vectorize-slp -faddrsig -D__GCC_HAVE_DWARF2_CFI_ASM=1 -o /tmp/test-4c9ef2.o -x c++ /usr/local/google/home/xiaofans/workspace/IPRA-exp/benchmarks/clang/test.cpp"  \; \
-	     split-window -h /bin/sh -c "lldb -s $(mkfile_path)gdbscript -- /usr/local/google/home/xiaofans/workspace/IPRA-exp/build/benchmarks/clang/install.dir/pgolto-full/bin/clang-14 -cc1 -triple x86_64-unknown-linux-gnu -emit-obj --mrelax-relocations -disable-free -clear-ast-before-backend -disable-llvm-verifier -discard-value-names -main-file-name test.cpp -mrelocation-model static -mframe-pointer=none -fmath-errno -ffp-contract=on -fno-rounding-math -mconstructor-aliases -funwind-tables=2 -target-cpu x86-64 -tune-cpu generic -mllvm -treat-scalable-fixed-error-as-warning -debug-info-kind=constructor -dwarf-version=5 -debugger-tuning=gdb -fcoverage-compilation-dir=/usr/local/google/home/xiaofans/workspace/IPRA-exp/build/benchmarks/clang -resource-dir /usr/local/google/home/xiaofans/workspace/IPRA-exp/build/benchmarks/clang/install.dir/pgolto-full-fdoipra/lib/clang/14.0.6 -internal-isystem /usr/lib/gcc/x86_64-linux-gnu/11/../../../../include/c++/11 -internal-isystem /usr/lib/gcc/x86_64-linux-gnu/11/../../../../include/x86_64-linux-gnu/c++/11 -internal-isystem /usr/lib/gcc/x86_64-linux-gnu/11/../../../../include/c++/11/backward -internal-isystem /usr/local/google/home/xiaofans/workspace/IPRA-exp/build/benchmarks/clang/install.dir/pgolto-full-fdoipra/lib/clang/14.0.6/include -internal-isystem /usr/local/include -internal-isystem /usr/lib/gcc/x86_64-linux-gnu/11/../../../../x86_64-linux-gnu/include -internal-externc-isystem /usr/include/x86_64-linux-gnu -internal-externc-isystem /include -internal-externc-isystem /usr/include -O3 -fdeprecated-macro -fdebug-compilation-dir=/usr/local/google/home/xiaofans/workspace/IPRA-exp/build/benchmarks/clang -ferror-limit 19 -fmessage-length=454 -fgnuc-version=4.2.1 -fcxx-exceptions -fexceptions -fcolor-diagnostics -vectorize-loops -vectorize-slp -faddrsig -D__GCC_HAVE_DWARF2_CFI_ASM=1 -o /tmp/test-4c9ef2.o -x c++ /usr/local/google/home/xiaofans/workspace/IPRA-exp/benchmarks/clang/test.cpp"  \; attach
-
-check-compare2:
-	@tmux new-session -d /bin/sh -c "lldb  -- /usr/local/google/home/xiaofans/workspace/IPRA-exp/build/benchmarks/clang/install.dir/pgolto-full-fdoipra/bin/clang-14 -cc1 -triple x86_64-unknown-linux-gnu -emit-obj --mrelax-relocations -disable-free -clear-ast-before-backend -disable-llvm-verifier -discard-value-names -main-file-name atomic.cpp -mrelocation-model static -mframe-pointer=none -fmath-errno -ffp-contract=on -fno-rounding-math -mconstructor-aliases -funwind-tables=2 -target-cpu x86-64 -tune-cpu generic -mllvm -treat-scalable-fixed-error-as-warning -debug-info-kind=constructor -dwarf-version=5 -debugger-tuning=gdb -fcoverage-compilation-dir=/usr/local/google/home/xiaofans/workspace/IPRA-exp/build/benchmarks/clang -resource-dir /usr/local/google/home/xiaofans/workspace/IPRA-exp/build/benchmarks/clang/install.dir/pgolto-full-fdoipra/lib/clang/14.0.6 -internal-isystem /usr/lib/gcc/x86_64-linux-gnu/11/../../../../include/c++/11 -internal-isystem /usr/lib/gcc/x86_64-linux-gnu/11/../../../../include/x86_64-linux-gnu/c++/11 -internal-isystem /usr/lib/gcc/x86_64-linux-gnu/11/../../../../include/c++/11/backward -internal-isystem /usr/local/google/home/xiaofans/workspace/IPRA-exp/build/benchmarks/clang/install.dir/pgolto-full-fdoipra/lib/clang/14.0.6/include -internal-isystem /usr/local/include -internal-isystem /usr/lib/gcc/x86_64-linux-gnu/11/../../../../x86_64-linux-gnu/include -internal-externc-isystem /usr/include/x86_64-linux-gnu -internal-externc-isystem /include -internal-externc-isystem /usr/include -O3 -fdeprecated-macro -fdebug-compilation-dir=/usr/local/google/home/xiaofans/workspace/IPRA-exp/build/benchmarks/clang -ferror-limit 19 -fgnuc-version=4.2.1 -fcxx-exceptions -fexceptions -fcolor-diagnostics -vectorize-loops -vectorize-slp -faddrsig -D__GCC_HAVE_DWARF2_CFI_ASM=1 -o /tmp/atomic-fe8433.o -x c++ /usr/local/google/home/xiaofans/workspace/IPRA-exp/benchmarks/clang/atomic.cpp"  \; \
-	     split-window -h /bin/sh -c "lldb  -- /usr/local/google/home/xiaofans/workspace/IPRA-exp/build/benchmarks/clang/install.dir/pgolto-full/bin/clang-14 -cc1 -triple x86_64-unknown-linux-gnu -emit-obj --mrelax-relocations -disable-free -clear-ast-before-backend -disable-llvm-verifier -discard-value-names -main-file-name atomic.cpp -mrelocation-model static -mframe-pointer=none -fmath-errno -ffp-contract=on -fno-rounding-math -mconstructor-aliases -funwind-tables=2 -target-cpu x86-64 -tune-cpu generic -mllvm -treat-scalable-fixed-error-as-warning -debug-info-kind=constructor -dwarf-version=5 -debugger-tuning=gdb -fcoverage-compilation-dir=/usr/local/google/home/xiaofans/workspace/IPRA-exp/build/benchmarks/clang -resource-dir /usr/local/google/home/xiaofans/workspace/IPRA-exp/build/benchmarks/clang/install.dir/pgolto-full/lib/clang/14.0.6 -internal-isystem /usr/lib/gcc/x86_64-linux-gnu/11/../../../../include/c++/11 -internal-isystem /usr/lib/gcc/x86_64-linux-gnu/11/../../../../include/x86_64-linux-gnu/c++/11 -internal-isystem /usr/lib/gcc/x86_64-linux-gnu/11/../../../../include/c++/11/backward -internal-isystem /usr/local/google/home/xiaofans/workspace/IPRA-exp/build/benchmarks/clang/install.dir/pgolto-full/lib/clang/14.0.6/include -internal-isystem /usr/local/include -internal-isystem /usr/lib/gcc/x86_64-linux-gnu/11/../../../../x86_64-linux-gnu/include -internal-externc-isystem /usr/include/x86_64-linux-gnu -internal-externc-isystem /include -internal-externc-isystem /usr/include -O3 -fdeprecated-macro -fdebug-compilation-dir=/usr/local/google/home/xiaofans/workspace/IPRA-exp/build/benchmarks/clang -ferror-limit 19 -fgnuc-version=4.2.1 -fcxx-exceptions -fexceptions -fcolor-diagnostics -vectorize-loops -vectorize-slp -faddrsig -D__GCC_HAVE_DWARF2_CFI_ASM=1 -o /tmp/atomic-fe8433.o -x c++ /usr/local/google/home/xiaofans/workspace/IPRA-exp/benchmarks/clang/atomic.cpp"  \; attach
-
-
-
-dbg1:
-	cd /usr/local/google/home/xiaofans/workspace/IPRA-exp/build/benchmarks/clang/build.dir/pgolto-full-fdoipra/ && /usr/local/google/home/xiaofans/workspace/IPRA-exp/install/llvm/bin/ld.lld -pie --eh-frame-hdr -m elf_x86_64 -dynamic-linker /lib64/ld-linux-x86-64.so.2 -o bin/clang-import-test /lib/x86_64-linux-gnu/Scrt1.o /lib/x86_64-linux-gnu/crti.o /usr/lib/gcc/x86_64-linux-gnu/11/crtbeginS.o -L/usr/lib/gcc/x86_64-linux-gnu/11 -L/usr/lib/gcc/x86_64-linux-gnu/11/../../../../lib64 -L/lib/x86_64-linux-gnu -L/lib/../lib64 -L/usr/lib/x86_64-linux-gnu -L/usr/lib/../lib64 -L/lib -L/usr/lib -plugin-opt=mcpu=x86-64 -plugin-opt=O3 -plugin-opt=cs-profile-path=/usr/local/google/home/xiaofans/workspace/IPRA-exp/build/benchmarks/clang/build.dir/instrumented/profiles/clang.profdata -mllvm -fdo-ipra -Bsymbolic-non-weak-functions --color-diagnostics --gc-sections tools/clang/tools/clang-import-test/CMakeFiles/clang-import-test.dir/clang-import-test.cpp.o -rpath \\RIGIN/../lib lib/libLLVMCore.a lib/libLLVMSupport.a -lpthread lib/libclangAST.a lib/libclangBasic.a lib/libclangCodeGen.a lib/libclangDriver.a lib/libclangFrontend.a lib/libclangLex.a lib/libclangParse.a lib/libclangSerialization.a lib/libclangDriver.a lib/libLLVMOption.a lib/libclangSema.a lib/libclangEdit.a lib/libclangAnalysis.a lib/libclangASTMatchers.a lib/libclangAST.a lib/libclangLex.a lib/libclangBasic.a lib/libLLVMCoverage.a lib/libLLVMLTO.a lib/libLLVMExtensions.a lib/libLLVMCodeGen.a lib/libLLVMPasses.a lib/libLLVMCoroutines.a lib/libLLVMipo.a lib/libLLVMFrontendOpenMP.a lib/libLLVMBitWriter.a lib/libLLVMIRReader.a lib/libLLVMAsmParser.a lib/libLLVMLinker.a lib/libLLVMInstrumentation.a lib/libLLVMObjCARCOpts.a lib/libLLVMVectorize.a lib/libLLVMScalarOpts.a lib/libLLVMAggressiveInstCombine.a lib/libLLVMInstCombine.a lib/libLLVMTarget.a lib/libLLVMTransformUtils.a lib/libLLVMAnalysis.a lib/libLLVMProfileData.a lib/libLLVMDebugInfoDWARF.a lib/libLLVMObject.a lib/libLLVMBitReader.a lib/libLLVMCore.a lib/libLLVMRemarks.a lib/libLLVMBitstreamReader.a lib/libLLVMMCParser.a lib/libLLVMMC.a lib/libLLVMDebugInfoCodeView.a lib/libLLVMTextAPI.a lib/libLLVMBinaryFormat.a lib/libLLVMSupport.a -lrt -ldl -lpthread -lm /usr/lib/x86_64-linux-gnu/libz.so /usr/lib/x86_64-linux-gnu/libtinfo.so lib/libLLVMDemangle.a -lstdc++ -lm -lgcc_s -lgcc -lc -lgcc_s -lgcc /usr/lib/gcc/x86_64-linux-gnu/11/crtendS.o /lib/x86_64-linux-gnu/crtn.o
-
-dbg1-gdb:
-	cd /usr/local/google/home/xiaofans/workspace/IPRA-exp/build/benchmarks/clang/build.dir/pgolto-full-fdoipra/ && gdb --args /usr/local/google/home/xiaofans/workspace/IPRA-exp/install/llvm/bin/ld.lld --args -pie --eh-frame-hdr -m elf_x86_64 -dynamic-linker /lib64/ld-linux-x86-64.so.2 -o bin/clang-import-test /lib/x86_64-linux-gnu/Scrt1.o /lib/x86_64-linux-gnu/crti.o /usr/lib/gcc/x86_64-linux-gnu/11/crtbeginS.o -L/usr/lib/gcc/x86_64-linux-gnu/11 -L/usr/lib/gcc/x86_64-linux-gnu/11/../../../../lib64 -L/lib/x86_64-linux-gnu -L/lib/../lib64 -L/usr/lib/x86_64-linux-gnu -L/usr/lib/../lib64 -L/lib -L/usr/lib -plugin-opt=mcpu=x86-64 -plugin-opt=O3 -plugin-opt=cs-profile-path=/usr/local/google/home/xiaofans/workspace/IPRA-exp/build/benchmarks/clang/build.dir/instrumented/profiles/clang.profdata -mllvm -fdo-ipra -Bsymbolic-non-weak-functions --color-diagnostics --gc-sections tools/clang/tools/clang-import-test/CMakeFiles/clang-import-test.dir/clang-import-test.cpp.o -rpath \\RIGIN/../lib lib/libLLVMCore.a lib/libLLVMSupport.a -lpthread lib/libclangAST.a lib/libclangBasic.a lib/libclangCodeGen.a lib/libclangDriver.a lib/libclangFrontend.a lib/libclangLex.a lib/libclangParse.a lib/libclangSerialization.a lib/libclangDriver.a lib/libLLVMOption.a lib/libclangSema.a lib/libclangEdit.a lib/libclangAnalysis.a lib/libclangASTMatchers.a lib/libclangAST.a lib/libclangLex.a lib/libclangBasic.a lib/libLLVMCoverage.a lib/libLLVMLTO.a lib/libLLVMExtensions.a lib/libLLVMCodeGen.a lib/libLLVMPasses.a lib/libLLVMCoroutines.a lib/libLLVMipo.a lib/libLLVMFrontendOpenMP.a lib/libLLVMBitWriter.a lib/libLLVMIRReader.a lib/libLLVMAsmParser.a lib/libLLVMLinker.a lib/libLLVMInstrumentation.a lib/libLLVMObjCARCOpts.a lib/libLLVMVectorize.a lib/libLLVMScalarOpts.a lib/libLLVMAggressiveInstCombine.a lib/libLLVMInstCombine.a lib/libLLVMTarget.a lib/libLLVMTransformUtils.a lib/libLLVMAnalysis.a lib/libLLVMProfileData.a lib/libLLVMDebugInfoDWARF.a lib/libLLVMObject.a lib/libLLVMBitReader.a lib/libLLVMCore.a lib/libLLVMRemarks.a lib/libLLVMBitstreamReader.a lib/libLLVMMCParser.a lib/libLLVMMC.a lib/libLLVMDebugInfoCodeView.a lib/libLLVMTextAPI.a lib/libLLVMBinaryFormat.a lib/libLLVMSupport.a -lrt -ldl -lpthread -lm /usr/lib/x86_64-linux-gnu/libz.so /usr/lib/x86_64-linux-gnu/libtinfo.so lib/libLLVMDemangle.a -lstdc++ -lm -lgcc_s -lgcc -lc -lgcc_s -lgcc /usr/lib/gcc/x86_64-linux-gnu/11/crtendS.o /lib/x86_64-linux-gnu/crtn.o && rr replay
-
+$(SOURCE)/.complete: $(CLANG_VERSION).zip
+	mkdir -p $(BUILD_PATH)/$(BENCHMARK)
+	cd $(BUILD_PATH)/$(BENCHMARK) && unzip -q -o $(PWD)/$<
+	touch $@
