@@ -100,7 +100,7 @@ endef
 
 define gen_perfdata
 
-$(1)$(2).perfdata: $(1)/.complete
+$(1)$(2).perfdata: $(1)/.complete $(BENCH_PROJECT)/.complete
 	$(call switch_binary,$(1),$(2))
 	$(call run_bench,$(INSTALL_DIR)/bin)
 	cd $(BENCH_DIR) && $(PERF) record -e cycles:u -j any,u -o ../$$@ -- $(TASKSET) bash ./perf_commands.sh
@@ -109,7 +109,7 @@ $(1)$(2).perfdata: $(1)/.complete
 	rm -rf $$@ 
 	mv $(BUILD_PATH)/$(BENCHMARK)/$$@ $$@
 
-$(1)$(2).regprof2: $(1)/.complete
+$(1)$(2).regprof2: $(1)/.complete $(BENCH_PROJECT)/.complete
 	$(call switch_binary,$(1),$(2))
 	$(call run_bench,$(INSTALL_DIR)/bin)
 	rm -rf $(PWD)/$$@.raw
@@ -117,7 +117,7 @@ $(1)$(2).regprof2: $(1)/.complete
 		LLVM_IRPP_PROFILE="$(PWD)/$$@.raw" $(DRRUN) bash ./perf_commands.sh
 	cat $(PWD)/$$@.raw | $(COUNTSUM) > $(PWD)/$$@
 
-$(1)$(2).regprof3: $(1).profbuild/.complete
+$(1)$(2).regprof3: $(1).profbuild/.complete $(BENCH_PROJECT)/.complete
 	$(call switch_binary,$(1).profbuild,$(2))
 	$(call run_bench,$(INSTALL_DIR)/bin)
 	rm -rf $(PWD)/$$@.raw
