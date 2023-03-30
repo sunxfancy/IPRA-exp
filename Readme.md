@@ -27,7 +27,7 @@ SingularityCE - installing it following the documentation: [https://docs.sylabs.
 4. run `./make benchmarks/${bench}/${target}.bench` can run the bench for this target
 5. run `./make benchmarks/${bench}/${target}.regprof3` can run the register and spill code profiling for this target
 
-E.g. Run the clang benchmark for thin-lto build with all features eanbled (Threshold for hot function = 3, Callsite Cold Ratio = 20):
+E.g. Run the clang benchmark register and spill code profiling for thin-lto build with all features eanbled (Threshold for hot function = 3, Callsite Cold Ratio = 20):
 
 ```
 ./make benchmarks/clang/pgo-full-bfdoipra6.3-20.regprof3
