@@ -3,35 +3,35 @@ cd $SCRIPTPATH/..
 
 function run() {
     if [[ $LOCAL_BENCH == "1" ]]; then 
-        bash benchmarks/hpcc-$1.sh pgo-full $2
-        bash benchmarks/hpcc-$1.sh pgo-full-fdoipra $2
-        bash benchmarks/hpcc-$1.sh pgo-full-fdoipra2 $2
-        bash benchmarks/hpcc-$1.sh pgo-full-fdoipra3 $2
-        bash benchmarks/hpcc-$1.sh pgo-full-bfdoipra $2
-        bash benchmarks/hpcc-$1.sh pgo-full-bfdoipra2 $2
-        bash benchmarks/hpcc-$1.sh pgo-full-bfdoipra3 $2
-        bash benchmarks/hpcc-$1.sh pgo-full-ipra $2
-        bash benchmarks/hpcc-$1.sh pgo-full-fdoipra4 $2
-        bash benchmarks/hpcc-$1.sh pgo-full-fdoipra5 $2
-        bash benchmarks/hpcc-$1.sh pgo-full-fdoipra6 $2
-        bash benchmarks/hpcc-$1.sh pgo-full-bfdoipra4 $2
-        bash benchmarks/hpcc-$1.sh pgo-full-bfdoipra5 $2
-        bash benchmarks/hpcc-$1.sh pgo-full-bfdoipra6 $2
+        bash benchmarks/hpcc-$1.sh pgo-thin $2
+        bash benchmarks/hpcc-$1.sh pgo-thin-fdoipra $2
+        bash benchmarks/hpcc-$1.sh pgo-thin-fdoipra2 $2
+        bash benchmarks/hpcc-$1.sh pgo-thin-fdoipra3 $2
+        bash benchmarks/hpcc-$1.sh pgo-thin-bfdoipra $2
+        bash benchmarks/hpcc-$1.sh pgo-thin-bfdoipra2 $2
+        bash benchmarks/hpcc-$1.sh pgo-thin-bfdoipra3 $2
+        bash benchmarks/hpcc-$1.sh pgo-thin-ipra $2
+        bash benchmarks/hpcc-$1.sh pgo-thin-fdoipra4 $2
+        bash benchmarks/hpcc-$1.sh pgo-thin-fdoipra5 $2
+        bash benchmarks/hpcc-$1.sh pgo-thin-fdoipra6 $2
+        bash benchmarks/hpcc-$1.sh pgo-thin-bfdoipra4 $2
+        bash benchmarks/hpcc-$1.sh pgo-thin-bfdoipra5 $2
+        bash benchmarks/hpcc-$1.sh pgo-thin-bfdoipra6 $2
     else 
-        sbatch benchmarks/hpcc-$1.sh pgo-full $2
-        sbatch benchmarks/hpcc-$1.sh pgo-full-fdoipra $2
-        sbatch benchmarks/hpcc-$1.sh pgo-full-fdoipra2 $2
-        sbatch benchmarks/hpcc-$1.sh pgo-full-fdoipra3 $2
-        sbatch benchmarks/hpcc-$1.sh pgo-full-bfdoipra $2
-        sbatch benchmarks/hpcc-$1.sh pgo-full-bfdoipra2 $2
-        sbatch benchmarks/hpcc-$1.sh pgo-full-bfdoipra3 $2
-        sbatch benchmarks/hpcc-$1.sh pgo-full-ipra $2
-        sbatch benchmarks/hpcc-$1.sh pgo-full-fdoipra4 $2
-        sbatch benchmarks/hpcc-$1.sh pgo-full-fdoipra5 $2
-        sbatch benchmarks/hpcc-$1.sh pgo-full-fdoipra6 $2
-        sbatch benchmarks/hpcc-$1.sh pgo-full-bfdoipra4 $2
-        sbatch benchmarks/hpcc-$1.sh pgo-full-bfdoipra5 $2
-        sbatch benchmarks/hpcc-$1.sh pgo-full-bfdoipra6 $2
+        sbatch benchmarks/hpcc-$1.sh pgo-thin $2
+        sbatch benchmarks/hpcc-$1.sh pgo-thin-fdoipra $2
+        sbatch benchmarks/hpcc-$1.sh pgo-thin-fdoipra2 $2
+        sbatch benchmarks/hpcc-$1.sh pgo-thin-fdoipra3 $2
+        sbatch benchmarks/hpcc-$1.sh pgo-thin-bfdoipra $2
+        sbatch benchmarks/hpcc-$1.sh pgo-thin-bfdoipra2 $2
+        sbatch benchmarks/hpcc-$1.sh pgo-thin-bfdoipra3 $2
+        sbatch benchmarks/hpcc-$1.sh pgo-thin-ipra $2
+        sbatch benchmarks/hpcc-$1.sh pgo-thin-fdoipra4 $2
+        sbatch benchmarks/hpcc-$1.sh pgo-thin-fdoipra5 $2
+        sbatch benchmarks/hpcc-$1.sh pgo-thin-fdoipra6 $2
+        sbatch benchmarks/hpcc-$1.sh pgo-thin-bfdoipra4 $2
+        sbatch benchmarks/hpcc-$1.sh pgo-thin-bfdoipra5 $2
+        sbatch benchmarks/hpcc-$1.sh pgo-thin-bfdoipra6 $2
     fi
 }
 

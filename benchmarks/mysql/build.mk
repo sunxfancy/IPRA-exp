@@ -87,7 +87,7 @@ endef
 
 define gen_perfdata
 
-$(1)$(2).perfdata: $(1)/.complete
+$(1)$(2).perfdata: | $(1)/.complete
 	$(call switch_binary,$(1),$(2))
 	cp -f $(mkfile_path)loadtest-funcs.sh ./loadtest-funcs.sh
 	$(call copy_to_server,$(1),$(2))
@@ -104,7 +104,7 @@ $(1)$(2).perfdata: $(1)/.complete
 	mv $(BUILD_PATH)/$(BENCHMARK)/$$@ $$@
 	rm -rf $(BUILD_PATH)/$(BENCHMARK)/$(1)$(2)
 
-$(1)$(2).regprof2: $(1)/.complete
+$(1)$(2).regprof2: | $(1)/.complete
 	$(call switch_binary,$(1),$(2))
 	cp -f $(mkfile_path)loadtest-funcs.sh ./loadtest-funcs.sh
 	rm -rf $(BUILD_PATH)/$(BENCHMARK)/$(1)$(2)
@@ -118,7 +118,7 @@ $(1)$(2).regprof2: $(1)/.complete
 	cat $(PWD)/$$@.raw | $(COUNTSUM) > $(PWD)/$$@
 	rm -rf $(BUILD_PATH)/$(BENCHMARK)/$(1)$(2)
 	
-$(1)$(2).regprof3: $(1).profbuild/.complete
+$(1)$(2).regprof3: | $(1).profbuild/.complete
 	$(call switch_binary,$(1).profbuild,$(2))
 	cp -f $(mkfile_path)loadtest-funcs.sh ./loadtest-funcs.sh
 	rm -rf $(BUILD_PATH)/$(BENCHMARK)/$(1)$(2)
@@ -136,7 +136,7 @@ endef
 
 define gen_bench
 
-$(1)$(2).bench: $(1)/.complete
+$(1)$(2).bench: | $(1)/.complete
 	$(call switch_binary,$(1),$(2))
 	cp -f $(mkfile_path)loadtest-funcs.sh ./loadtest-funcs.sh
 	$(call copy_to_server,$(1),$(2))
