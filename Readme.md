@@ -27,6 +27,12 @@ SingularityCE - installing it following the documentation: [https://docs.sylabs.
 4. run `./make benchmarks/${bench}/${target}.bench` can run the bench for this target
 5. run `./make benchmarks/${bench}/${target}.regprof3` can run the register and spill code profiling for this target
 
+E.g. Run the clang benchmark for thin-lto build with all features eanbled (Threshold for hot function = 3, Callsite Cold Ratio = 20):
+
+```
+./make benchmarks/clang/pgo-full-bfdoipra6.3-20.regprof3
+```
+
 ## Quickly Reproducing the Benchmarks
 
 Run `./make benchmarks` to run all benchmarks
@@ -98,8 +104,9 @@ Number A: The threshold for how many times could be considered as a hot function
 Number B: Callsite Cold Ratio, in the PGO profiling data, which callsite should be considered as a cold callsite. e.g. 10 means if the hit frequence at entry of the caller function has 10 times larger than the hit frequence at callsite, this is a cold callsite.
 
 Available A: 1 3 5 10
-
 Availabel B: 10 20
+
+
 
 
 
