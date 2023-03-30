@@ -78,7 +78,7 @@ define run_bench
 			-DCMAKE_LINKER=/usr/bin/gcc \
 			-DCMAKE_USER_MAKE_RULES_OVERRIDE=$(mkfile_path)makerules.cmake \
 			-DCMAKE_BUILD_WITH_INSTALL_RPATH=ON \
-		&& (ninja -t commands  | head -100 > perf_commands_raw.sh) \
+		&& (ninja -t commands  | head -500 > perf_commands_raw.sh) \
 		&& echo '/^\:\ \&\&\.*/d; /^\/usr\/bin\/cmake\.*/d;' \
 		&& (sed '/^\:\ \&\&\.*/d; /^\/usr\/bin\/cmake\.*/d;' ./perf_commands_raw.sh > ./perf_commands.sh) \
 		&& chmod +x ./perf_commands.sh; \
@@ -100,7 +100,7 @@ endef
 
 define gen_perfdata
 
-$(1)$(2).perfdata: $(1)/.complete $(BENCH_PROJECT)/.complete
+$(1)$(2).perfdata: | $(1)/.complete $(BENCH_PROJECT)/.complete
 	$(call switch_binary,$(1),$(2))
 	$(call run_bench,$(INSTALL_DIR)/bin)
 	cd $(BENCH_DIR) && $(PERF) record -e cycles:u -j any,u -o ../$$@ -- $(TASKSET) bash ./perf_commands.sh
@@ -109,7 +109,7 @@ $(1)$(2).perfdata: $(1)/.complete $(BENCH_PROJECT)/.complete
 	rm -rf $$@ 
 	mv $(BUILD_PATH)/$(BENCHMARK)/$$@ $$@
 
-$(1)$(2).regprof2: $(1)/.complete $(BENCH_PROJECT)/.complete
+$(1)$(2).regprof2: | $(1)/.complete $(BENCH_PROJECT)/.complete
 	$(call switch_binary,$(1),$(2))
 	$(call run_bench,$(INSTALL_DIR)/bin)
 	rm -rf $(PWD)/$$@.raw
@@ -117,11 +117,11 @@ $(1)$(2).regprof2: $(1)/.complete $(BENCH_PROJECT)/.complete
 		LLVM_IRPP_PROFILE="$(PWD)/$$@.raw" $(DRRUN) bash ./perf_commands.sh
 	cat $(PWD)/$$@.raw | $(COUNTSUM) > $(PWD)/$$@
 
-$(1)$(2).regprof3: $(1).profbuild/.complete $(BENCH_PROJECT)/.complete
+$(1)$(2).regprof3: | $(1).profbuild/.complete $(BENCH_PROJECT)/.complete
 	$(call switch_binary,$(1).profbuild,$(2))
 	$(call run_bench,$(INSTALL_DIR)/bin)
 	rm -rf $(PWD)/$$@.raw
-	cd $(BENCH_DIR) && \
+	cd $(BENCH_DIR) && \rrrrrrrrrrrrrrrrrr
 		LLVM_IRPP_PROFILE="$(PWD)/$$@.raw" \
 		$(TASKSET) bash ./perf_commands.sh
 	cat $(PWD)/$$@.raw | $(COUNTSUM) > $(PWD)/$$@
@@ -132,7 +132,7 @@ endef
 
 define gen_bench
 
-$(1)$(2).bench: $(1)/.complete
+$(1)$(2).bench: | $(1)/.complete
 	$(call switch_binary,$(1),$(2))
 	$(call run_bench,$(INSTALL_DIR)/bin)
 	cd $(BENCH_DIR) && $(PERF) stat $(PERF_EVENTS) -o ../$$@ -r5 -- $(TASKSET) bash ./perf_commands.sh

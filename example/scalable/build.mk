@@ -4,8 +4,10 @@ PROFILE_DIR:=$(PWD)/pgo
 LINKER_FLAGS:=-Wl,-z,keep-text-section-prefix -Wl,--build-id -fno-optimize-sibling-calls -Wl,-mllvm -Wl,-fast-isel=false \
 			  -fsplit-machine-functions -Wl,-Bsymbolic-non-weak-functions \
 			  -Wl,-mllvm -Wl,-EnablePushPopProfile -Wl,-mllvm -Wl,-EnableSpillBytesProfile $(ROOT)/push-pop-counter/lib.o
-FDOIPRA_FLAGS:= -Wl,-mllvm -Wl,-debug-only=fdo-ipra -Wl,-mllvm -Wl,-fdo-ipra -Wl,-mllvm -Wl,-fdoipra-both-hot  # -Wl,-mllvm -Wl,-fdoipra-ch -Wl,-mllvm -Wl,-fdoipra-hc -Wl,-mllvm -Wl,-fdoipra-use-caller-reg 
-#-Wl,-mllvm -Wl,-disable-thinlto-funcattrs -Wl,-mllvm -Wl,-fdoipra-new-impl
+FDOIPRA_FLAGS:= -Wl,-mllvm -Wl,-debug-only=fdo-ipra -Wl,-mllvm -Wl,-fdo-ipra -Wl,-mllvm -Wl,-fdoipra-both-hot \
+				-Wl,-mllvm -Wl,-fdoipra-ch -Wl,-mllvm -Wl,-fdoipra-hc -Wl,-mllvm -Wl,-fdoipra-use-caller-reg \
+				-Wl,-mllvm -Wl,-fdoipra-psi=$(PWD)/fdoipra.psi \
+				-Wl,-mllvm -Wl,-disable-thinlto-funcattrs=false -Wl,-mllvm -Wl,-fdoipra-new-impl
 
 SOURCE:=$(mkfile_path)test.c $(mkfile_path)main.c
 

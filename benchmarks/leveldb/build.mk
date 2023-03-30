@@ -9,7 +9,7 @@ common_compiler_flags +=  -fPIC -DNDEBUG \
 	 -Wno-error -Wno-error=int-conversion -Wno-error=implicit-function-declaration \
 	 -Wno-enum-constexpr-conversion -Wno-error=unused-but-set-variable -Wno-error=deprecated-copy
 
-MAIN_BIN = db_bench
+MAIN_BIN=db_bench
 BUILD_ACTION=build_leveldb
 BUILD_TARGET=db_bench
 INSTALL_TARGET=db_bench
@@ -26,7 +26,7 @@ define build_leveldb
 		-DCMAKE_CXX_COMPILER=$(NCXX) \
 		-DCMAKE_INSTALL_PREFIX=$(INSTALL_DIR) \
 		$(2) > $(PWD)/$(1)/conf.log	
-	cd $(BUILD_DIR)/$(1) && CLANG_PROXY_FOCUS=db_bench \
+	cd $(BUILD_DIR)/$(1) && CLANG_PROXY_DEBUG=1 CLANG_PROXY_FOCUS=db_bench \
 		CLANG_PROXY_ARGS="$(4)" CLANG_PROXY_VAR="$(5)" \
 		time -o $(PWD)/$(1)/time.log ninja $(3) -j $(shell nproc) -v > $(PWD)/$(1)/build.log \
 		|| { echo "*** build failed ***"; exit 1 ; }
@@ -38,21 +38,21 @@ endef
 
 define gen_perfdata
 
-$(1)$(2).perfdata: $(1)/.complete
+$(1)$(2).perfdata: | $(1)/.complete
 	mkdir -p $(BENCH_DIR) && cd $(BENCH_DIR) && \
 		$(PERF) record -e cycles:u -j any,u -o ../$$@ -- $(TASKSET) $(PWD)/$(1)/$(MAIN_BIN)$(2) --db=$(BENCH_DIR)
 	rm -rf $(BENCH_DIR) 
 	rm -rf $$@ 
 	mv $(BUILD_PATH)/$(BENCHMARK)/$$@ $$@
 
-$(1)$(2).regprof2: $(1)/.complete
+$(1)$(2).regprof2: | $(1)/.complete
 	rm -rf $(PWD)/$$@.raw
 	mkdir -p $(BENCH_DIR) && cd $(BENCH_DIR) && \
 		LLVM_IRPP_PROFILE="$(PWD)/$$@.raw" $(DRRUN) $(PWD)/$(1)/$(MAIN_BIN)$(2) --db=$(BENCH_DIR)
 	rm -rf $(BENCH_DIR) 
 	cat $(PWD)/$$@.raw | $(COUNTSUM) > $(PWD)/$$@
 
-$(1)$(2).regprof3: $(1).profbuild/.complete
+$(1)$(2).regprof3: | $(1).profbuild/.complete
 	rm -rf $(PWD)/$$@.raw
 	mkdir -p $(BENCH_DIR) && cd $(BENCH_DIR) && \
 		LLVM_IRPP_PROFILE="$(PWD)/$$@.raw" $(PWD)/$(1).profbuild/$(MAIN_BIN)$(2) --db=$(BENCH_DIR)
@@ -63,17 +63,17 @@ endef
 
 define gen_bench
 
-$(1)$(2).bench: $(1)/.complete
+$(1)$(2).bench: | $(1)/.complete
 	mkdir -p $(BENCH_DIR) && cd $(BENCH_DIR) && \
 		$(PERF) stat $(PERF_EVENTS) -o ../$$@ -r5 -- $(TASKSET) $(PWD)/$(1)/$(MAIN_BIN)$(2) --db=$(BENCH_DIR)
-	rm -rf $(BENCH_DIR) 
+	rm -rf $(BENCH_DIR)
 	rm -rf $$@
 	mv $(BUILD_PATH)/$(BENCHMARK)/$$@ $$@
 
 endef 
 
-additional_compiler_flags = $(if $(find thin,$(1)),-flto=thin,)  $(if $(find full,$(1)),-flto=full,) -fprofile-use=$(PWD)/instrumented.profdata
-additional_linker_flags = $(if $(find thin,$(1)),-flto=thin,)  $(if $(find full,$(1)),-flto=full,) -fprofile-use=$(PWD)/instrumented.profdata
+additional_compiler_flags = $(if $(findstring thin,$(1)),-flto=thin,)  $(if $(findstring full,$(1)),-flto=full,) -fprofile-use=$(PWD)/instrumented.profdata
+additional_linker_flags = $(if $(findstring thin,$(1)),-flto=thin,)  $(if $(findstring full,$(1)),-flto=full,) -fprofile-use=$(PWD)/instrumented.profdata
 
 
 $(eval $(call gen_pgo_targets,thin))

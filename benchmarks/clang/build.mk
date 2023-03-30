@@ -71,7 +71,9 @@ define clang_bench
 			-DCMAKE_C_COMPILER=$(1)/clang \
 			-DCMAKE_CXX_COMPILER=$(1)/clang++ \
 			-DLLVM_ENABLE_PROJECTS="clang" \
-		&& (ninja -t commands | head -100 > perf_commands.sh) \
+		&& (ninja -t commands  | head -100 > perf_commands_raw.sh) \
+		&& echo '/^\:\ \&\&\.*/d; /^\/usr\/bin\/cmake\.*/d;' \
+		&& (sed '/^\:\ \&\&\.*/d; /^\/usr\/bin\/cmake\.*/d;' ./perf_commands_raw.sh > ./perf_commands.sh) \
 		&& chmod +x ./perf_commands.sh; \
 	fi
 endef
@@ -97,7 +99,7 @@ endef
 
 define gen_perfdata
 
-$(1)$(2).perfdata: $(1)/.complete $(SOURCE)/.complete
+$(1)$(2).perfdata: | $(1)/.complete $(SOURCE)/.complete
 	$(call switch_binary,$(1),$(2))
 	$(call clang_bench,$(INSTALL_DIR)/bin)
 	mkdir -p $(BENCH_DIR) && cd $(BENCH_DIR) && \
@@ -107,7 +109,7 @@ $(1)$(2).perfdata: $(1)/.complete $(SOURCE)/.complete
 	rm -rf $$@ 
 	mv $(BUILD_PATH)/$(BENCHMARK)/$$@ $$@
 
-$(1)$(2).regprof2: $(1)/.complete $(SOURCE)/.complete
+$(1)$(2).regprof2: | $(1)/.complete $(SOURCE)/.complete
 	$(call switch_binary,$(1),$(2))
 	$(call clang_bench,$(INSTALL_DIR)/bin)
 	rm -rf $(PWD)/$$@.raw
@@ -115,7 +117,7 @@ $(1)$(2).regprof2: $(1)/.complete $(SOURCE)/.complete
 		LLVM_IRPP_PROFILE="$(PWD)/$$@.raw" $(DRRUN) bash ./perf_commands.sh
 	cat $(PWD)/$$@.raw | $(COUNTSUM) > $(PWD)/$$@
 
-$(1)$(2).regprof3: $(1).profbuild/.complete $(SOURCE)/.complete
+$(1)$(2).regprof3: | $(1).profbuild/.complete $(SOURCE)/.complete
 	$(call switch_binary,$(1).profbuild,$(2))
 	$(call clang_bench,$(INSTALL_DIR)/bin)
 	rm -rf $(PWD)/$$@.raw
@@ -127,7 +129,7 @@ endef
 
 define gen_bench
 
-$(1)$(2).bench: $(1)/.complete
+$(1)$(2).bench: | $(1)/.complete
 	$(call switch_binary,$(1),$(2))
 	$(call clang_bench,$(INSTALL_DIR)/bin)
 	$(call copy_to_server,$(1),$(2))

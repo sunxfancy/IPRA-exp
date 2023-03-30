@@ -53,6 +53,9 @@ __thread uint64_t __LLVM_IRPP_ReloadInPrologueForNCeSR = 0;
 __thread uint64_t __LLVM_IRPP_SpillInPrologueForNCrSR = 0;
 __thread uint64_t __LLVM_IRPP_ReloadInPrologueForNCrSR = 0;
 
+__thread uint64_t __LLVM_IRPP_MemoryLoad = 0;
+__thread uint64_t __LLVM_IRPP_MemoryStore = 0;
+
 void __LLVM_IRPP_ProfileDtor(void* arg) {
     __LLVM_IRPP.Spill += __LLVM_IRPP_Spill;
     __LLVM_IRPP.Reload += __LLVM_IRPP_Reload;

@@ -1,6 +1,6 @@
 
-benchmarks: benchmarks/gcc/regprof3 benchmarks/clang/regprof3 benchmarks/mysql/regprof3 benchmarks/leveldb/regprof3 benchmarks/gcc/bench benchmarks/clang/bench benchmarks/mysql/bench benchmarks/leveldb/bench 
-	
+benchmarks: benchmarks/gcc/build benchmarks/leveldb/build  benchmarks/clang/build benchmarks/mysql/build  benchmarks/gcc/regprof3 benchmarks/leveldb/regprof3 benchmarks/clang/regprof3 benchmarks/mysql/regprof3  
+
 # make benchmarks/SPEC/bench
 
 benchmarks-build: benchmarks/clang/build benchmarks/mysql/build benchmarks/gcc/build # benchmarks/SPEC
@@ -8,7 +8,7 @@ benchmarks-build: benchmarks/clang/build benchmarks/mysql/build benchmarks/gcc/b
 FDOIPRA_FLAVORS := fdoipra bfdoipra fdoipra2 bfdoipra2 fdoipra3 bfdoipra3 fdoipra4 bfdoipra4 fdoipra5 bfdoipra5 fdoipra6 bfdoipra6
 PGO_FULL_FLAVORS := pgo-full $(foreach f,$(FDOIPRA_FLAVORS),pgo-full-$(f)) pgo-full-ipra
 PGO_THIN_FLAVORS := pgo-thin $(foreach f,$(FDOIPRA_FLAVORS),pgo-thin-$(f)) pgo-thin-ipra
-FLAVORS := $(PGO_FULL_FLAVORS)
+FLAVORS := $(PGO_FULL_FLAVORS) $(PGO_THIN_FLAVORS)
 
 # -mno-sse -mno-avx
 COMPILER_FLAGS:=-fuse-ld=lld -fbasic-block-sections=labels -Qunused-arguments -funique-internal-linkage-names -fno-optimize-sibling-calls -mllvm -fast-isel=false -fsplit-machine-functions
@@ -17,8 +17,8 @@ LINKER_FLAGS:=-fuse-ld=lld -static-libgcc -static-libstdc++  -Wl,--lto-basic-blo
 COMPILER_FLAGS_IPRA:= -mllvm -enable-ipra
 LINKER_FLAGS_IPRA:= -Wl,-mllvm -Wl,-enable-ipra
 
-COMPILER_FLAGS_FDOIPRA:= -mllvm -fdo-ipra -mllvm -fdoipra-both-hot=false
-LINKER_FLAGS_FDOIPRA:= -Wl,-mllvm -Wl,-fdo-ipra -Wl,-mllvm -Wl,-fdoipra-both-hot=false
+COMPILER_FLAGS_FDOIPRA:= -mllvm -fdo-ipra -mllvm -fdoipra-both-hot=false  -mllvm -disable-thinlto-funcattrs=false -mllvm -fdoipra-new-impl
+LINKER_FLAGS_FDOIPRA:= -Wl,-mllvm -Wl,-fdo-ipra -Wl,-mllvm -Wl,-fdoipra-both-hot=false -Wl,-mllvm -Wl,-disable-thinlto-funcattrs=false -Wl,-mllvm -Wl,-fdoipra-new-impl
 
 COMPILER_FLAGS_BFDOIPRA:= -mllvm -fdo-ipra 
 LINKER_FLAGS_BFDOIPRA:= -Wl,-mllvm -Wl,-fdo-ipra
@@ -89,3 +89,6 @@ COMPARE_ARGS:="-cc1" "-triple" "x86_64-unknown-linux-gnu" "-emit-obj" "--mrelax-
 compare: 
 	tmux new-session -d /bin/sh -c 'cd $(COMPARE_BASE_DIR) && lldb -- $(COMPARE_BIN_DIR)/$(COMPARE_A) $(COMPARE_ARGS)' \; \
 	     split-window -h /bin/sh -c 'cd $(COMPARE_BASE_DIR) && lldb -- $(COMPARE_BIN_DIR)/$(COMPARE_B) $(COMPARE_ARGS)' \; attach
+
+diff:
+	$(RADIFF2) -a x86 -D $(COMPARE_BIN_DIR)/pgo-full/bin/clang-14 $(COMPARE_BIN_DIR)/pgo-full-fdoipra3/bin/clang-14 | head -n 100

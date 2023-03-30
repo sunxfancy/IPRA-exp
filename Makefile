@@ -24,6 +24,8 @@ HOT_LIST_CREATOR:= $(PWD)/install/autofdo/hot_list_creator
 REG_PROFILER:= $(PWD)/install/autofdo/reg_profiler
 UMAKE := $(PWD)/install/UMake
 
+RADIFF2:=$(PWD)/install/radare2/usr/bin/radiff2
+
 HPCC_HOST:=cluster.hpcc.ucr.edu
 HPCC_USER:=xsun042
 
@@ -274,6 +276,13 @@ install/ppcount:
 	mkdir -p build/ppcount
 	cd build/ppcount && cmake -DDynamoRIO_DIR=$(INSTALL_PATH)/DynamoRIO-Linux-9.0.19328/cmake -G Ninja ../../push-pop-counter
 	cd build/ppcount && ninja && cp libppcount.so $(INSTALL_PATH)/libppcount.so
+
+install/radare2:
+	cd install && wget https://github.com/radareorg/radare2/releases/download/5.8.2/radare2-5.8.2-static.tar.xz
+	cd install && tar -xJf radare2-5.8.2-static.tar.xz && rm radare2-5.8.2-static.tar.xz
+	mv install/r2-static install/radare2
+	touch $@
+
 jupyter:
 	jupyter notebook
 
