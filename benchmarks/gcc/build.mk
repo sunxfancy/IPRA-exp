@@ -121,7 +121,7 @@ $(1)$(2).regprof3: | $(1).profbuild/.complete $(BENCH_PROJECT)/.complete
 	$(call switch_binary,$(1).profbuild,$(2))
 	$(call run_bench,$(INSTALL_DIR)/bin)
 	rm -rf $(PWD)/$$@.raw
-	cd $(BENCH_DIR) && \rrrrrrrrrrrrrrrrrr
+	cd $(BENCH_DIR) && \
 		LLVM_IRPP_PROFILE="$(PWD)/$$@.raw" \
 		$(TASKSET) bash ./perf_commands.sh
 	cat $(PWD)/$$@.raw | $(COUNTSUM) > $(PWD)/$$@
