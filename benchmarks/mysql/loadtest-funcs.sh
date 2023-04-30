@@ -25,7 +25,7 @@ skip-networking
 
 EOF
   rm -fr "install.dir/data"
-  "install.dir/bin/mysqld" \
+  lldb -- "install.dir/bin/mysqld" \
       --defaults-file=install.dir/my.cnf --datadir=$pwd/${mysql_dir}/data --initialize-insecure --user=${USER} 
   if [[ "$?" -ne 0 ]]; then echo "*** setup failed ***" ; return 1; fi
   return 0

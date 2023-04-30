@@ -5,7 +5,7 @@ include $(mkfile_path)../common.mk
 GCC_VERSION:=10.4.0
 GCC_NAME:=gcc-$(GCC_VERSION)
 SOURCE = $(BUILD_PATH)/$(BENCHMARK)/gcc-releases-$(GCC_NAME)
-BENCH_PROJECT =  $(BUILD_PATH)/$(BENCHMARK)/libevent-2.1.12-stable
+BENCH_PROJECT =  $(BUILD_PATH)/$(BENCHMARK)/libiconv-master
 
 gen_compiler_flags =CFLAGS=$(1) CXXFLAGS=$(1)
 gen_linker_flags   =LDFLAGS=$(1)
@@ -80,7 +80,9 @@ define run_bench
 			-DCMAKE_BUILD_WITH_INSTALL_RPATH=ON \
 		&& (ninja -t commands  | head -500 > perf_commands_raw.sh) \
 		&& echo '/^\:\ \&\&\.*/d; /^\/usr\/bin\/cmake\.*/d;' \
-		&& (sed '/^\:\ \&\&\.*/d; /^\/usr\/bin\/cmake\.*/d;' ./perf_commands_raw.sh > ./perf_commands.sh) \
+		&& (sed '/^\:\ \&\&\.*/d; /^\/usr\/bin\/cmake\.*/d;' ./perf_commands_raw.sh > ./perf_commands_raw2.sh) \
+		&& echo '$$$$d' \
+		&& (sed '$$$$d' ./perf_commands_raw2.sh > ./perf_commands.sh) \
 		&& chmod +x ./perf_commands.sh; \
 	fi
 endef 
@@ -167,6 +169,14 @@ instrumented.profdata:  instrumented/.complete
 	cd $(BENCH_DIR) && ./perf_commands.sh
 	cd $(INSTRUMENTED_PROF) && $(LLVM_BIN)/llvm-profdata merge -output=$(PWD)/instrumented.profdata *
 
+v1.44.2.tar.gz:
+	wget https://github.com/libuv/libuv/archive/refs/tags/v1.44.2.tar.gz
+
+master.zip:
+	wget https://github.com/xbmc/libiconv/archive/refs/heads/master.zip
+
+libiconv-1.17.tar.gz:
+	wget https://ftp.gnu.org/pub/gnu/libiconv/libiconv-1.17.tar.gz
 
 libevent-2.1.12-stable.tar.gz:
 	wget https://github.com/libevent/libevent/releases/download/release-2.1.12-stable/libevent-2.1.12-stable.tar.gz
@@ -184,7 +194,7 @@ $(SOURCE)/.complete: $(GCC_NAME).zip $(BENCH_PROJECT)/.complete
 	&& find . -type f -name configure -exec sed -i 's/\$$CC \$$CPPFLAGS \$$CFLAGS \$$LDFLAGS -print-multi-os-directory/gcc -print-multi-os-directory/g' {} \;
 	touch $@
 
-$(BENCH_PROJECT)/.complete: libevent-2.1.12-stable.tar.gz
+$(BENCH_PROJECT)/.complete: master.zip
 	mkdir -p $(BUILD_PATH)/$(BENCHMARK)
-	cd $(BUILD_PATH)/$(BENCHMARK) && tar -xzf $(PWD)/$< 
+	cd $(BUILD_PATH)/$(BENCHMARK) && unzip $(PWD)/$<  # tar -xzf $(PWD)/$< 
 	touch $@
