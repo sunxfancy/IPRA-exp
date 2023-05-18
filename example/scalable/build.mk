@@ -10,14 +10,14 @@ FDOIPRA_FLAGS:= -Wl,-mllvm -Wl,-debug-only=fdo-ipra -Wl,-mllvm -Wl,-fdo-ipra -Wl
 				-Wl,-mllvm -Wl,-disable-thinlto-funcattrs=false -Wl,-mllvm -Wl,-fdoipra-new-impl
 
 SOURCE:=$(mkfile_path)test.c $(mkfile_path)main.c
-
+NCC:=/home/riple/IPRA-exp/install/llvm/bin/clang
 
 define build
 	mkdir -p $1
 	$(NCC) $2 -c -O3 $(mkfile_path)test.c -o $1/test.o
 	$(NCC) $2 -c -O3 $(mkfile_path)main.c -o $1/main.o
-	$(NCC) $2 $3 -fuse-ld=lld -Wl,--save-temps -O3 $1/test.o $1/main.o -o $1/main 
 	$(NCC) $2 $3 -fuse-ld=lld -O3 $1/test.o $1/main.o -o $1/main -###
+	$(NCC) $2 $3 -fuse-ld=lld -Wl,--save-temps -O3 $1/test.o $1/main.o -o $1/main 
 	objdump -d $1/main > $1/main.s
 	$(LLVM_ROOT_PATH)/bin/llvm-dwarfdump $1/main
 endef

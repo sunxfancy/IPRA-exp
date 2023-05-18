@@ -53,20 +53,20 @@ function set_bench() {
     fi
 }
 
-set_bench $1 pgo-full bench
-set_bench $1 pgo-full-fdoipra bench
-set_bench $1 pgo-full-fdoipra2 bench
-set_bench $1 pgo-full-fdoipra3 bench
-set_bench $1 pgo-full-bfdoipra bench
-set_bench $1 pgo-full-bfdoipra2 bench
-set_bench $1 pgo-full-bfdoipra3 bench
-set_bench $1 pgo-full-ipra bench
-set_bench $1 pgo-full-fdoipra4 bench
-set_bench $1 pgo-full-fdoipra5 bench
-set_bench $1 pgo-full-fdoipra6 bench
-set_bench $1 pgo-full-bfdoipra4 bench
-set_bench $1 pgo-full-bfdoipra5 bench
-set_bench $1 pgo-full-bfdoipra6 bench
+set_bench $1 pgo-thin bench
+set_bench $1 pgo-thin-fdoipra bench
+set_bench $1 pgo-thin-fdoipra2 bench
+set_bench $1 pgo-thin-fdoipra3 bench
+set_bench $1 pgo-thin-bfdoipra bench
+set_bench $1 pgo-thin-bfdoipra2 bench
+set_bench $1 pgo-thin-bfdoipra3 bench
+set_bench $1 pgo-thin-ipra bench
+set_bench $1 pgo-thin-fdoipra4 bench
+set_bench $1 pgo-thin-fdoipra5 bench
+set_bench $1 pgo-thin-fdoipra6 bench
+set_bench $1 pgo-thin-bfdoipra4 bench
+set_bench $1 pgo-thin-bfdoipra5 bench
+set_bench $1 pgo-thin-bfdoipra6 bench
 
 # Run the tasks:
 $parallel "mkdir -p /dev/shm/xsun042/$SLURM_JOBID/{%}; $srun singularity exec singularity/image.sif make BUILD_PATH=/dev/shm/xsun042/$SLURM_JOBID/{%} {}" ::: "${arguments[@]}"

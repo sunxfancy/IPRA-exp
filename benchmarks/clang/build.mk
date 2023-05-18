@@ -129,7 +129,7 @@ endef
 
 define gen_bench
 
-$(1)$(2).bench: | $(1)/.complete
+$(1)$(2).bench: | $(SOURCE)/.complete
 	$(call switch_binary,$(1),$(2))
 	$(call clang_bench,$(INSTALL_DIR)/bin)
 	$(call copy_to_server,$(1),$(2))

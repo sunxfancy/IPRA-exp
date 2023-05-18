@@ -134,7 +134,7 @@ endef
 
 define gen_bench
 
-$(1)$(2).bench: | $(1)/.complete
+$(1)$(2).bench: | $(SOURCE)/.complete
 	$(call switch_binary,$(1),$(2))
 	$(call run_bench,$(INSTALL_DIR)/bin)
 	cd $(BENCH_DIR) && $(PERF) stat $(PERF_EVENTS) -o ../$$@ -r5 -- $(TASKSET) bash ./perf_commands.sh

@@ -40,7 +40,7 @@ TASKSET:=
 # TASKSET:=taskset -c 0 
 
 REMOTE_PERF:=false
-PERF_PATH:=/usr/lib/linux-tools/5.15.0-57-generic/perf
+PERF_PATH:=/usr/lib/linux-tools/5.15.0-72-generic/perf
 # PERF_PATH:=/usr/lib/linux-hwe-tools-4.18.0-21/perf
 ifeq ($(REMOTE_PERF), true)
 	COPY_TO_REMOTE:=bash $(PWD)/scripts/copy-to-test-machine.sh

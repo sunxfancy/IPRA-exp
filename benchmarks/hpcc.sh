@@ -44,18 +44,25 @@ function build() {
 
 function bench_each() {
     echo sbatch --parsable benchmarks/bench.sh $1
-    job_id=$(sbatch --parsable benchmarks/bench.sh $1)
+    job_id=`sbatch --parsable benchmarks/bench.sh $1`
+    echo $job_id
     host=`scontrol show job $job_id | grep ' NodeList' | awk -F'=' '{print $2}'`
-    until [ "$host" != "(null)" ]
+    until [ "$host" != "" ]
     do
         echo "Waiting for the job executed ..."
         host=`scontrol show job $job_id | grep ' NodeList' | awk -F'=' '{print $2}'`
         sleep 3
     done
-    echo sbatch --parsable --dependency=after:${job_id} -w $host benchmarks/bench.sh $1
-    sbatch --parsable --dependency=after:${job_id} -w $host benchmarks/bench.sh $1
+    echo $host
+    echo sbatch --parsable --dependency=after:$job_id -w $host benchmarks/bench.sh $1
+    job_id=`sbatch --parsable --dependency=after:$job_id -w $host benchmarks/bench.sh $1`
+    job_id=`sbatch --parsable --dependency=after:$job_id -w $host benchmarks/bench.sh $1`
+    job_id=`sbatch --parsable --dependency=after:$job_id -w $host benchmarks/bench.sh $1`
+    job_id=`sbatch --parsable --dependency=after:$job_id -w $host benchmarks/bench.sh $1`
+    job_id=`sbatch --parsable --dependency=after:$job_id -w $host benchmarks/bench.sh $1`
+    job_id=`sbatch --parsable --dependency=after:$job_id -w $host benchmarks/bench.sh $1`
+    job_id=`sbatch --parsable --dependency=after:$job_id -w $host benchmarks/bench.sh $1`
 }
-
 
 function bench() {
     bench_each leveldb
