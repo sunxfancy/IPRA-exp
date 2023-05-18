@@ -136,7 +136,7 @@ endef
 
 define gen_bench
 
-$(1)$(2).bench: | $(1)/.complete
+$(1)$(2).bench:
 	$(call switch_binary,$(1),$(2))
 	cp -f $(mkfile_path)loadtest-funcs.sh ./loadtest-funcs.sh
 	$(call copy_to_server,$(1),$(2))

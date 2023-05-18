@@ -1,0 +1,205 @@
+diff --git a/llvm/include/llvm/InitializePasses.h b/llvm/include/llvm/InitializePasses.h
+index 8cf31c08dff8..e9e00963c4bf 100644
+--- a/llvm/include/llvm/InitializePasses.h
++++ b/llvm/include/llvm/InitializePasses.h
+@@ -151,6 +151,8 @@ void initializeExpandReductionsPass(PassRegistry&);
+ void initializeExpandVectorPredicationPass(PassRegistry &);
+ void initializeMakeGuardsExplicitLegacyPassPass(PassRegistry&);
+ void initializeExternalAAWrapperPassPass(PassRegistry&);
++void initializeFDOAttrModificationPass(PassRegistry&);
++void initializeFDOAttrModification2Pass(PassRegistry&);
+ void initializeFEntryInserterPass(PassRegistry&);
+ void initializeFinalizeISelPass(PassRegistry&);
+ void initializeFinalizeMachineBundlesPass(PassRegistry&);
+diff --git a/llvm/lib/CodeGen/CodeGen.cpp b/llvm/lib/CodeGen/CodeGen.cpp
+index 5050395fbc0f..e90d91cadc60 100644
+--- a/llvm/lib/CodeGen/CodeGen.cpp
++++ b/llvm/lib/CodeGen/CodeGen.cpp
+@@ -38,6 +38,8 @@ void llvm::initializeCodeGen(PassRegistry &Registry) {
+   initializeEarlyTailDuplicatePass(Registry);
+   initializeExpandMemCmpPassPass(Registry);
+   initializeExpandPostRAPass(Registry);
++  initializeFDOAttrModificationPass(Registry);
++  initializeFDOAttrModification2Pass(Registry);
+   initializeFEntryInserterPass(Registry);
+   initializeFinalizeISelPass(Registry);
+   initializeFinalizeMachineBundlesPass(Registry);
+diff --git a/llvm/lib/CodeGen/FDOAttrModificationPass.cpp b/llvm/lib/CodeGen/FDOAttrModificationPass.cpp
+index b223e92e0a37..8793166b1cbb 100644
+--- a/llvm/lib/CodeGen/FDOAttrModificationPass.cpp
++++ b/llvm/lib/CodeGen/FDOAttrModificationPass.cpp
+@@ -7,6 +7,7 @@
+ #include "llvm/Analysis/CallGraph.h"
+ #include "llvm/Analysis/LazyBlockFrequencyInfo.h"
+ #include "llvm/Analysis/ProfileSummaryInfo.h"
++#include "llvm/Analysis/ModuleSummaryAnalysis.h"
+ #include "llvm/CodeGen/LazyMachineBlockFrequencyInfo.h"
+ #include "llvm/CodeGen/MachineFunctionPass.h"
+ #include "llvm/CodeGen/MachineModuleInfo.h"
+@@ -42,7 +43,6 @@ using namespace llvm;
+ 
+ #define DEBUG_TYPE "fdo-ipra"
+ 
+-static cl::opt<bool> UseNewImpl("fdoipra-new-impl", cl::init(false), cl::Hidden);
+ 
+ static cl::opt<bool> OnHotEntryAndHotCallGraph("fdoipra-both-hot", cl::init(true), cl::Hidden);
+ static cl::opt<bool> ColdCallsiteColdCallee("fdoipra-cc", cl::init(true), cl::Hidden);
+@@ -67,6 +67,8 @@ static cl::opt<bool> ChangeDWARF("fdoipra-dwarf", cl::init(false), cl::Hidden);
+ 
+ namespace llvm {
+   cl::opt<std::string> MapOutput("bbidx_map", cl::init(""), cl::Hidden);
++  cl::opt<bool> UseNewImpl("fdoipra-new-impl", cl::init(false), cl::Hidden);
++
+   static void findAllCallsite(llvm::Function &F, SmallVector<CallInst*, 64>& callsites);
+   static void markFunctionNoCalleeSaved(llvm::Function &F);
+ }
+@@ -626,25 +628,26 @@ class FDOAttrModification : public ModulePass, public FDOQuery {
+     ModulePass::getAnalysisUsage(AU);
+     AU.addRequired<ProfileSummaryInfoWrapperPass>();
+     AU.addRequired<BlockFrequencyInfoWrapperPass>();
++    AU.addRequired<ImmutableModuleSummaryIndexWrapperPass>();
+     AU.setPreservesAll();
+   }
+ 
+   bool runOnModule(Module &M) override;
+ 
+- protected:
+   static char ID;
++ protected:
++  const ModuleSummaryIndex* msi;
+ 
+   void CalleeToCaller(llvm::Function &F);
+   void CallerToCallee(llvm::Function &F);
+ };
+ 
+-char FDOAttrModification::ID = 0;
+ 
+ 
+ void FDOAttrModification::CalleeToCaller(llvm::Function &F) {
+   if (ColdCallsiteColdCallee) {
+     LLVM_DEBUG(dbgs() << "Now Function: " << F.getName() << "\n");
+-    if (isFunctionEntryCold(&F)) {
++    if (!F.getFunctionType()->isVarArg() && isFunctionEntryCold(&F)) {
+       LLVM_DEBUG(dbgs() << "ColdFunction: " << F.getName() << "\n");
+       markFunctionNoCallerSaved(F);
+     }
+@@ -661,8 +664,13 @@ void FDOAttrModification::CalleeToCaller(llvm::Function &F) {
+   for (auto* call : callsites) {
+     if (ColdCallsiteColdCallee) {
+       Function *callee = call->getCalledFunction();
+-      if (callee && isFunctionEntryCold(callee)) {
+-        markFunctionNoCallerSaved(*callee);
++      
++      if (callee && !callee->getFunctionType()->isVarArg() && isFunctionEntryCold(callee) && msi) {
++        std::string name = GlobalValue::getGlobalIdentifier(callee->getName(), GlobalValue::ExternalLinkage, "");
++        auto GUID = GlobalValue::getGUID(name);
++        ValueInfo GV = msi->getValueInfo(GUID);
++        if (GV && !GV.getSummaryList().empty())
++          markFunctionNoCallerSaved(*callee);
+       }
+     }
+   }
+@@ -731,7 +739,8 @@ void FDOAttrModification::CallerToCallee(llvm::Function &F) {
+ 
+ bool FDOAttrModification::runOnModule(Module &M) {
+   if (!initProfile()) return false;
+-
++  msi = getAnalysis<ImmutableModuleSummaryIndexWrapperPass>().getIndex();
++  
+   for (auto &F : M) {
+     if (F.isDeclaration()) continue;
+     initBlockFreqInfo(&F);
+@@ -772,12 +781,9 @@ class FDOAttrModification2 : public ModulePass, public FDOQuery {
+   void CallerToCallee(llvm::Function &F);
+ 
+   bool runOnModule(Module &M) override;
+-
+- protected:
+   static char ID;
+ };
+ 
+-char FDOAttrModification2::ID = 0;
+ 
+ 
+ void FDOAttrModification2::CalleeToCaller(llvm::Function &F) {
+@@ -906,31 +912,33 @@ bool FDOAttrModification2::runOnModule(Module &M) {
+ }
+ 
+ Pass *createFDOAttrModificationPass() {
+-  if (UseNewImpl)
+-    return new FDOAttrModification(); 
+-  else 
+-    return new FDOAttrModification2();
++  return new llvm::FDOAttrModification(); 
+ }
+ 
+-class FDORegisterInfoCollector : public ModulePass {
+-public:
+-  FDORegisterInfoCollector() : ModulePass(ID) {}
+-protected:
+-  static char ID;
+-};
++Pass *createFDOAttrModification2Pass() {
++  return new llvm::FDOAttrModification2();
++}
+ 
+-char FDORegisterInfoCollector::ID = 0;
+ 
++}   // namespace llvm
+ 
+-class FDORegisterMaskPropagator : public ModulePass {
+-public:
+-  FDORegisterMaskPropagator() : ModulePass(ID) {}
+ 
+-protected:
+-  static char ID;
+-};
++char llvm::FDOAttrModification::ID = 0;
++char llvm::FDOAttrModification2::ID = 0;
+ 
+-char FDORegisterMaskPropagator::ID = 0;
+ 
++INITIALIZE_PASS_BEGIN(FDOAttrModification, "fdo-attr-modification",
++                "FDOIPRA pass", false, false)
++INITIALIZE_PASS_DEPENDENCY(ProfileSummaryInfoWrapperPass)
++INITIALIZE_PASS_DEPENDENCY(BlockFrequencyInfoWrapperPass)
++INITIALIZE_PASS_DEPENDENCY(ImmutableModuleSummaryIndexWrapperPass)
++INITIALIZE_PASS_END(FDOAttrModification, "fdo-attr-modification",
++                "FDOIPRA pass", false, false)
++
++INITIALIZE_PASS_BEGIN(FDOAttrModification2, "fdo-attr-modification2",
++                "FDOIPRA2 pass", false, false)
++INITIALIZE_PASS_DEPENDENCY(ProfileSummaryInfoWrapperPass)
++INITIALIZE_PASS_DEPENDENCY(BlockFrequencyInfoWrapperPass)
++INITIALIZE_PASS_END(FDOAttrModification2, "fdo-attr-modification2",
++                "FDOIPRA2 pass", false, false)
+ 
+-}   // namespace llvm
+diff --git a/llvm/lib/CodeGen/TargetPassConfig.cpp b/llvm/lib/CodeGen/TargetPassConfig.cpp
+index 189c82b47099..2c00c5e914f0 100644
+--- a/llvm/lib/CodeGen/TargetPassConfig.cpp
++++ b/llvm/lib/CodeGen/TargetPassConfig.cpp
+@@ -389,8 +389,11 @@ namespace llvm {
+ 
+ extern cl::opt<bool> EnableFSDiscriminator;
+ extern Pass* createFDOAttrModificationPass();
++extern Pass* createFDOAttrModification2Pass();
+ 
+ static cl::opt<bool> FDO_IPRA("fdo-ipra", cl::Hidden, cl::init(false), cl::desc("Enable FDO-based IPRA"));
++extern cl::opt<bool> UseNewImpl;
++
+ extern cl::opt<std::string> MapOutput;
+ extern MachineFunctionPass *createMapBBIndexPass();
+ 
+@@ -916,7 +919,10 @@ void TargetPassConfig::addIRPasses() {
+     addPass(createLowerGlobalDtorsLegacyPass());
+ 
+   if (FDO_IPRA) {
+-    addPass(createFDOAttrModificationPass());
++    if (UseNewImpl)
++      addPass(createFDOAttrModificationPass());
++    else 
++      addPass(createFDOAttrModification2Pass());
+   }
+   
+   // Make sure that no unreachable blocks are instruction selected.

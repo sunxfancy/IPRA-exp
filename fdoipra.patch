@@ -1,0 +1,1538 @@
+diff --git a/llvm/include/llvm/IR/CallingConv.h b/llvm/include/llvm/IR/CallingConv.h
+index 395a19d595de..372cbfaded43 100644
+--- a/llvm/include/llvm/IR/CallingConv.h
++++ b/llvm/include/llvm/IR/CallingConv.h
+@@ -237,6 +237,9 @@ namespace CallingConv {
+     /// Preserve X2-X15, X19-X29, SP, Z0-Z31, P0-P15.
+     AArch64_SME_ABI_Support_Routines_PreserveMost_From_X2 = 103,
+ 
++    /// X86 GP Registers No Caller Saved
++    X86_GP_INTR = 104,
++
+     /// The highest possible ID. Must be some 2^k - 1.
+     MaxID = 1023
+   };
+diff --git a/llvm/lib/CodeGen/CMakeLists.txt b/llvm/lib/CodeGen/CMakeLists.txt
+index 7a3a82b10c5c..5e7bc9e5d5a5 100644
+--- a/llvm/lib/CodeGen/CMakeLists.txt
++++ b/llvm/lib/CodeGen/CMakeLists.txt
+@@ -62,6 +62,7 @@ add_llvm_component_library(LLVMCodeGen
+   ExpandReductions.cpp
+   ExpandVectorPredication.cpp
+   FaultMaps.cpp
++  FDOAttrModificationPass.cpp
+   FEntryInserter.cpp
+   FinalizeISel.cpp
+   FixupStatepointCallerSaved.cpp
+diff --git a/llvm/lib/CodeGen/FDOAttrModificationPass.cpp b/llvm/lib/CodeGen/FDOAttrModificationPass.cpp
+new file mode 100644
+index 000000000000..d98133a79c69
+--- /dev/null
++++ b/llvm/lib/CodeGen/FDOAttrModificationPass.cpp
+@@ -0,0 +1,870 @@
++
++#include "llvm/Analysis/BlockFrequencyInfo.h"
++#include "llvm/Support/Alignment.h"
++#include "llvm/ADT/SmallVector.h"
++#include "llvm/ADT/Statistic.h"
++#include "llvm/ADT/StringRef.h"
++#include "llvm/Analysis/CallGraph.h"
++#include "llvm/Analysis/LazyBlockFrequencyInfo.h"
++#include "llvm/Analysis/ProfileSummaryInfo.h"
++#include "llvm/CodeGen/LazyMachineBlockFrequencyInfo.h"
++#include "llvm/CodeGen/MachineFunctionPass.h"
++#include "llvm/CodeGen/MachineModuleInfo.h"
++#include "llvm/CodeGen/MachineOperand.h"
++#include "llvm/CodeGen/MachineRegisterInfo.h"
++#include "llvm/CodeGen/Passes.h"
++#include "llvm/CodeGen/RegisterUsageInfo.h"
++#include "llvm/CodeGen/TargetFrameLowering.h"
++#include "llvm/IR/BasicBlock.h"
++#include "llvm/IR/DerivedTypes.h"
++#include "llvm/IR/Function.h"
++#include "llvm/IR/IRBuilder.h"
++#include "llvm/IR/Instructions.h"
++#include "llvm/IR/LLVMContext.h"
++#include "llvm/IR/Module.h"
++#include "llvm/Support/Debug.h"
++#include "llvm/Support/raw_ostream.h"
++#include "llvm/Transforms/Utils/BasicBlockUtils.h"
++#include "llvm/Transforms/Utils/Cloning.h"
++#include "llvm/IR/DIBuilder.h"
++#include "llvm/IR/Verifier.h"
++
++#include <algorithm>
++#include <cstddef>
++#include <cstdint>
++#include <fstream>
++#include <sstream>
++#include <string>
++#include <iostream>
++#include <functional>
++
++using namespace llvm;
++
++#define DEBUG_TYPE "fdo-ipra"
++
++static cl::opt<bool> UseNewImpl("fdoipra-new-impl", cl::init(false), cl::Hidden);
++
++static cl::opt<bool> OnHotEntryAndHotCallGraph("fdoipra-both-hot", cl::init(true), cl::Hidden);
++static cl::opt<bool> ColdCallsiteColdCallee("fdoipra-cc", cl::init(true), cl::Hidden);
++static cl::opt<bool> ColdCallsiteHotCallee("fdoipra-ch", cl::init(false), cl::Hidden);
++static cl::opt<bool> HotCallsiteColdCallee("fdoipra-hc", cl::init(false), cl::Hidden);
++static cl::opt<bool> HotCallsiteHotCallee("fdoipra-hh", cl::init(false), cl::Hidden);
++static cl::opt<bool> BasicIPRA("fdoipra-basic", cl::init(false), cl::Hidden);
++
++static cl::opt<bool> UseCalleeReg("fdoipra-use-callee-reg", cl::init(true), cl::Hidden);
++static cl::opt<bool> UseCallerReg("fdoipra-use-caller-reg", cl::init(false), cl::Hidden);
++
++static cl::opt<std::string> RegProfilePath("fdoipra-profile", cl::init(""), cl::Hidden);
++static cl::opt<bool> FDOIPRARunOnMachineFunction("fdoipra-on-machinefunc", cl::init(false), cl::Hidden);
++
++static cl::opt<std::string> UseMapOutput("use_bbidx_map", cl::init(""), cl::Hidden);
++static cl::opt<std::string> AdditionHotFunctionList("fdoipra-hot-list", cl::init(""), cl::Hidden);
++static cl::opt<std::string> OutputPSI("fdoipra-psi", cl::ValueOptional, cl::init("off"), cl::Hidden);
++static cl::opt<float> CallsiteColdRatio("fdoipra-ccr", cl::init(10.0f), cl::Hidden);
++
++static cl::opt<bool> NCSR_UseClone("fdoipra-use-clone", cl::init(false), cl::Hidden);
++static cl::opt<bool> ChangeDWARF("fdoipra-dwarf", cl::init(false), cl::Hidden);
++
++namespace llvm {
++  cl::opt<std::string> MapOutput("bbidx_map", cl::init(""), cl::Hidden);
++}
++
++namespace {
++
++struct RegProfile {
++  struct Function {
++    int hot_on_entry;
++    std::set<int> hot_bb_idx;
++  };
++
++  std::map<std::string, Function> hot_functions;
++
++  void load(std::string path) {
++    std::ifstream input(path);
++    std::string line1, line2;
++    while (std::getline(input, line1)) {
++      std::getline(input, line2);
++
++      std::istringstream iss(line1);
++      std::string function;
++      int hot_on_entry;
++      int size;
++      iss >> function >> hot_on_entry >> size;
++
++      std::istringstream iss2(line2);
++      std::set<int> hot_bb_idx;
++      for (int i = 0; i < size; ++i) {
++        int bb_idx;
++        iss2 >> bb_idx;
++        hot_bb_idx.insert(bb_idx);
++      }
++      hot_functions[function] = Function{hot_on_entry, hot_bb_idx};
++    }
++  }
++
++  static RegProfile &getProfile() {
++    static RegProfile profile;
++    if (!RegProfilePath.empty())
++      profile.load(RegProfilePath);
++    return profile;
++  }
++};
++
++
++/**
++ * This class is used to query the frequence of a function or a callsite
++ */
++class FDOQuery {
++ public:
++  FDOQuery(llvm::Pass* pass) : pass(pass) {}
++
++  // first check hot function list, then check PSI, 
++  bool isFunctionEntryCold(const Function *f) {
++    if (use_hot_function_list &&
++        hot_functions.count(f->getName().str())) return false;
++    if (use_PSI) {
++      return PSI->isFunctionEntryCold(f);
++    } else {
++      auto it = RP->hot_functions.find(f->getName().str());
++      return it == RP->hot_functions.end() || it->second.hot_on_entry == 0;
++    }
++  }
++
++  bool isFunctionEntryHot(const Function *f) {
++    if (use_hot_function_list &&
++        hot_functions.count(f->getName().str())) return true;
++    if (use_PSI) {
++      return PSI->isFunctionEntryHot(f);
++    } else {
++      auto it = RP->hot_functions.find(f->getName().str());
++      return it != RP->hot_functions.end() && it->second.hot_on_entry != 0;
++    }
++  }
++
++  bool isColdCallSite(const CallBase &b) {
++    if (use_PSI) {
++      if (PSI->isColdCallSite(b, BFI)) {
++        auto callsite = BFI->getBlockProfileCount(b.getParent());
++        auto entry = BFI->getBlockProfileCount(
++                              &b.getFunction()->getEntryBlock());
++        if (callsite.has_value() && entry.has_value()) {
++          return entry.value() > callsite.value() * CallsiteColdRatio;
++        }
++      }
++      return false;
++      // This method is not suitable here
++      // return PSI->isColdCallSite(b, BFI);
++    } else {
++      // TODO: map machine basic block back to here
++      return false;
++    }
++  }
++
++  bool isFunctionHotInCallGraph(const Function* f) {
++    if (use_hot_function_list &&
++        hot_functions.count(f->getName().str())) return true;
++    if (use_PSI) {
++      return PSI->isFunctionHotInCallGraph(f, *BFI);
++    } else {
++      return RP->hot_functions.find(f->getName().str()) !=
++             RP->hot_functions.end();
++    }
++  }
++
++  bool initProfile() {
++    if (!has_profile && !RegProfilePath.empty()) {
++      has_profile = true;
++      RP = &RegProfile::getProfile();
++      use_PSI = false;
++    } else {
++      PSI = &pass->getAnalysis<ProfileSummaryInfoWrapperPass>().getPSI();
++      if (PSI && PSI->hasProfileSummary()) {
++        use_PSI = true;
++        has_profile = true;
++      }
++    }
++    if (!use_hot_function_list && !AdditionHotFunctionList.empty()) {
++      std::fstream fin(AdditionHotFunctionList, std::ios_base::in);
++      std::string name;
++      while (std::getline(fin, name)) hot_functions.insert(name);
++      use_hot_function_list = true;
++    }
++    return has_profile;
++  }
++
++  void initBlockFreqInfo(Function *F) {
++    if (use_PSI) {
++      BFI = &pass->getAnalysis<BlockFrequencyInfoWrapperPass>(*F).getBFI();
++    } else {
++      auto it = RP->hot_functions.find(F->getName().str());
++      if (it != RP->hot_functions.end()) {
++        hot_bb = &it->second.hot_bb_idx;
++        hot_on_entry = it->second.hot_on_entry;
++      }
++    }
++  }
++
++ protected:
++  bool has_profile = false;
++  bool use_PSI = true;
++
++  llvm::Pass* pass;
++
++  ProfileSummaryInfo *PSI = nullptr;
++  BlockFrequencyInfo *BFI = nullptr;
++  RegProfile *RP = nullptr;
++  bool hot_on_entry = false;
++  std::set<int> *hot_bb = nullptr;
++
++  bool use_hot_function_list = false;
++public:
++  std::set<std::string> hot_functions;
++};
++
++
++}    // namespace
++
++
++namespace llvm {
++
++/**
++ * This pass is used to map the bb_index to the original basic block
++ */
++class MapBBIndex : public MachineFunctionPass {
++ public:
++  MapBBIndex() : MachineFunctionPass(ID) {}
++
++  StringRef getPassName() const override {
++    return "Map BBIndex to BasicBlock Index";
++  }
++
++  bool doInitialization(Module& M) override {
++    LLVM_DEBUG(errs() << "Map Output: " << MapOutput);
++    out.open(MapOutput, std::ios_base::out | std::ios_base::app);
++    return false;
++  }
++
++  bool doFinalization(Module& M) override {
++    out.close();
++    return false;
++  }
++
++  int getNumber(const BasicBlock* bb) {
++    if (bb == nullptr) return -1;
++    const Function* F = bb->getParent();
++    unsigned i; auto b = F->begin();
++    for (i = 0; b != F->end(); b++, i++) {
++      if (b.getNodePtr() == bb) return i;
++    }
++    return -1;
++  }
++
++  bool runOnMachineFunction(MachineFunction &MF) override {
++    if (MF.getName().empty()) return false;
++
++    // basic block to machine basic block ids
++    std::map<unsigned, unsigned> idx_map;
++
++    for (auto& MBB : MF) {
++      const auto* BB = MBB.getBasicBlock();
++      int index = getNumber(BB);
++      if (index != -1) {
++        idx_map[index] = MBB.getNumber();
++      }
++    }
++
++    // print to file
++    out << MF.getName().str() << " " << idx_map.size() << std::endl;
++    for (auto it : idx_map) {
++      out << it.first << " " << it.second << std::endl;
++    }
++    idx_map.clear();
++    return false;
++  }
++
++ protected:
++  static char ID;
++  std::fstream out;
++};
++
++char MapBBIndex::ID = 0;
++
++MachineFunctionPass *createMapBBIndexPass() { return new MapBBIndex(); }
++
++
++struct BBMap {
++  void initBBMap() {
++    if (UseMapOutput.empty()) return;
++    std::fstream input(UseMapOutput, std::ios_base::in);
++
++    std::string name; int size;
++    while (!input.eof()) {
++      input >> name >> size;
++      for (int i = 0; i < size; i++) {
++        int p, q;
++        input >> p >> q;
++        data[p] = q;
++      }
++    }
++  }
++  std::map<int, int> data;
++};
++
++static void markFunctionNoCalleeSaved(llvm::Function &F) {
++  if (F.hasFnAttribute("no_callee_saved_registers") == false)
++    F.addFnAttr("no_callee_saved_registers");
++}
++
++static void markFunctionNoCallerSaved(llvm::Function &F) {
++  if (F.hasFnAttribute("no_caller_saved_registers") == false)
++    F.addFnAttr("no_caller_saved_registers");
++}
++
++static void markFunctionIPRALeaf(llvm::Function &F) {
++  if (F.hasFnAttribute("ipra_leaf_node") == false)
++    F.addFnAttr("ipra_leaf_node");
++}
++
++static void findAllCallsite(llvm::Function &F, SmallVector<CallInst*, 64>& callsites) {
++  for (auto &BB : F)
++    for (auto &MI : BB)
++      if (MI.getOpcode() == Instruction::Call) {
++        CallInst *call = dyn_cast<CallInst>(&MI);
++        callsites.push_back(call);
++      }
++}
++
++
++static bool isLeafInCallGraph(llvm::Function *F) {
++  for (auto &BB : *F) 
++    for (auto &I : BB) {
++      auto *CI = dyn_cast<CallInst>(&I);
++      auto *II = dyn_cast<InvokeInst>(&I);
++      if (CI || II) return false;
++    }
++  return true;
++}
++
++
++static Function *completeFunction(Function *F, CallInst *Call) {
++  if (!F->isDeclaration())
++    return F;
++  BasicBlock *BB = BasicBlock::Create(F->getContext(), "", F);
++  IRBuilder<> Builder(BB);
++
++  int indirect_offset = Call->isIndirectCall() ? 1 : 0;
++  SmallVector<Value *, 12> arguments;
++  for (int i = 0; i < Call->getFunctionType()->getFunctionNumParams(); ++i) {
++    arguments.push_back(F->getArg(i + indirect_offset));
++  }
++
++  auto *callee =
++      Call->isIndirectCall() ? F->getArg(0) : Call->getCalledOperand();
++
++  auto *call = Builder.CreateCall(Call->getFunctionType(), callee, arguments);
++  if (F->getReturnType()->isVoidTy())
++    Builder.CreateRetVoid();
++  else
++    Builder.CreateRet(call);
++  return F;
++}
++
++static Function *createAndReplaceUsingProxyFunction(CallInst *Call, Module &M) {
++  if (Call->isIndirectCall()) {
++    auto *FT = Call->getFunctionType();
++    auto v = FT->params().vec();
++    v.insert(v.begin(), Call->getCalledOperand()->getType());
++
++    auto *NFT = FunctionType::get(FT->getReturnType(), v, FT->isVarArg());
++    auto *NF = Function::Create(NFT, GlobalValue::LinkageTypes::InternalLinkage, "", M);
++    NF->addFnAttr(Attribute::AttrKind::NoInline);
++    completeFunction(NF, Call);
++
++    SmallVector<Value *, 12> args;
++    args.push_back(Call->getCalledOperand());
++    for (auto k = Call->arg_begin(); k != Call->arg_end(); ++k) {
++      args.push_back(k->get());
++    }
++
++    llvm::ReplaceInstWithInst(Call, CallInst::Create(NFT, NF, args));
++    return NF;
++  } else {
++    LLVM_DEBUG(dbgs() << "createAndReplaceUsingProxyFunction Failed: " << *Call << "\n");
++    return nullptr;
++  }
++}
++
++
++static Function *createProxyFunction(CallInst *Call, Module &M) {
++  Function *F = Call->getCalledFunction();
++  if (F == nullptr) {
++    LLVM_DEBUG(dbgs() << "createProxyFunction Failed: " << *Call << "\n");
++    return nullptr;
++  }
++  std::string name = F->getName().str();
++  std::string new_name = name + "$NCSRProxy";
++  LLVM_DEBUG(dbgs() << "createProxyFunction: " << new_name << "\n");
++  LLVM_DEBUG(dbgs() << "createProxyFunction: " << *F << "\n");
++  auto NF =
++      M.getOrInsertFunction(new_name, F->getFunctionType(), F->getAttributes());
++  LLVM_DEBUG(dbgs() << *(NF.getFunctionType()) << "\n";);
++  LLVM_DEBUG(dbgs() << *(NF.getCallee()) << "\n";);
++
++  dyn_cast<Function>(NF.getCallee())->addFnAttr(Attribute::AttrKind::NoInline);
++  dyn_cast<Function>(NF.getCallee())
++      ->setLinkage(GlobalValue::LinkageTypes::InternalLinkage);
++  auto FF = completeFunction(dyn_cast<Function>(NF.getCallee()), Call);
++  Call->setCalledFunction(FF);
++  return FF;
++}
++
++struct Record {
++  std::string name;
++  uint64_t freq;
++  bool no_caller_saved_registers = false;
++  bool no_callee_saved_registers = false;
++  bool in_hot_list = false;
++
++  bool operator<(const Record& other) const {
++    if (freq < other.freq) return true;
++    if (freq == other.freq) return name < other.name;
++    return false;
++  }
++};
++
++struct RecordFile {
++  bool should_dump = false;
++
++  std::string path;
++  void setPath(std::string p) { 
++    path = p; should_dump = true; 
++    LLVM_DEBUG(dbgs() << "set path: " << path << "\n");
++    LLVM_DEBUG(dbgs() << "on object: " << this << "\n");
++  }
++
++  std::mutex mut;
++  std::vector<Record> hot;
++  std::vector<Record> normal;
++  std::vector<Record> cold;
++
++  void dump() {
++    std::sort(hot.begin(), hot.end());
++    std::sort(cold.begin(), cold.end());
++    std::sort(normal.begin(), normal.end());
++
++    std::vector<Record>* buffer[3] = {&hot,  &cold,  &normal };
++    std::vector<std::string> names = {"hot", "cold", "normal"};
++    std::ofstream fout(path, std::ios_base::out);
++    for (int i = 0; i < 3; ++i) {
++      fout << names[i] << " functions:" << std::endl;
++      for (int j = 0; j < buffer[i]->size(); ++j) {
++        Record& c = buffer[i]->at(j);
++        fout << (c.no_caller_saved_registers? "* ": "")<< (c.no_callee_saved_registers? "$ ": "") << 
++          c.name << " " << c.freq << (c.in_hot_list ? " hl" : "") << std::endl;
++      }
++    }
++  }
++
++  void dumpOnExit() {
++    if (should_dump) dump();
++  }
++
++  static RecordFile* getInst() {
++    static RecordFile inst;
++    return &inst;
++  }
++
++};
++
++
++void fdoipra_debug_output() {
++  RecordFile::getInst()->dumpOnExit();
++}
++
++
++void dumpPSI(Module &M, llvm::Pass* pass, FDOQuery* query) {
++  std::string path = OutputPSI.empty() ? std::string("/tmp/fdoipra-psi.txt")
++                                       : OutputPSI;
++  auto* PSI = &pass->getAnalysis<ProfileSummaryInfoWrapperPass>().getPSI();
++  LLVM_DEBUG(dbgs() << "PSI is NULL: " << (PSI == nullptr) << "\n");
++  if (PSI == nullptr) return;
++  RecordFile::getInst()->setPath(path);
++  
++  
++  std::vector<Record> hot;
++  std::vector<Record> normal;
++  std::vector<Record> cold;
++
++  for (auto &F : M) {
++    if (F.isDeclaration()) continue;
++    auto* BFI = &pass->getAnalysis<BlockFrequencyInfoWrapperPass>(F).getBFI();
++    LLVM_DEBUG(dbgs() << "BFI is NULL: " << (BFI == nullptr) << "\n");
++    if (!BFI) continue;
++    bool in_hot_list = query->hot_functions.count(F.getName().str()) != 0;
++    auto bpc = BFI->getBlockProfileCount(&F.getEntryBlock());
++    uint64_t count = 0;
++    if (bpc.has_value()) count = bpc.value();
++    Record record{F.getName().str(), count,
++        F.hasFnAttribute("no_caller_saved_registers"), 
++        F.hasFnAttribute("no_callee_saved_registers"),
++        in_hot_list};
++
++    if (PSI->isFunctionEntryHot(&F))
++      hot.push_back(record);
++    else if (PSI->isFunctionEntryCold(&F))
++      cold.push_back(record);
++    else
++      normal.push_back(record);
++  }
++
++  {
++    std::lock_guard<std::mutex> lock(RecordFile::getInst()->mut);
++    RecordFile::getInst()->hot.insert(RecordFile::getInst()->hot.end(), hot.begin(), hot.end());
++    RecordFile::getInst()->normal.insert(RecordFile::getInst()->normal.end(), normal.begin(), normal.end());
++    RecordFile::getInst()->cold.insert(RecordFile::getInst()->cold.end(), cold.begin(), cold.end());
++  }
++}
++
++
++// ---------------------------------------------
++
++
++/**
++ *  This implementation works both for ThinLTO and FullLTO
++ */
++class FDOAttrModification : public ModulePass, public FDOQuery {
++ public:
++  FDOAttrModification() : ModulePass(ID), FDOQuery(this) {}
++
++  StringRef getPassName() const override {
++    return "FDO based Attributes Modification Pass";
++  }
++
++  void getAnalysisUsage(AnalysisUsage &AU) const override {
++    ModulePass::getAnalysisUsage(AU);
++    AU.addRequired<ProfileSummaryInfoWrapperPass>();
++    AU.addRequired<BlockFrequencyInfoWrapperPass>();
++    AU.setPreservesAll();
++  }
++
++  bool runOnModule(Module &M) override;
++
++ protected:
++  static char ID;
++
++  void CalleeToCaller(llvm::Function &F);
++  void CallerToCallee(llvm::Function &F);
++};
++
++char FDOAttrModification::ID = 0;
++
++
++void FDOAttrModification::CalleeToCaller(llvm::Function &F) {
++  if (ColdCallsiteColdCallee) {
++    LLVM_DEBUG(dbgs() << "Now Function: " << F.getName() << "\n");
++    if (isFunctionEntryCold(&F)) {
++      LLVM_DEBUG(dbgs() << "ColdFunction: " << F.getName() << "\n");
++      markFunctionNoCallerSaved(F);
++    }
++  }
++
++  if (OnHotEntryAndHotCallGraph) {
++    if (!isFunctionEntryHot(&F) && !isFunctionHotInCallGraph(&F)) return;
++  } else {
++    if (!isFunctionEntryHot(&F)) return;
++  }
++  
++  SmallVector<CallInst *, 64> callsites;
++  for (auto &BB : F)
++    for (auto &MI : BB)
++      if (MI.getOpcode() == Instruction::Call) {
++        CallInst *call = dyn_cast<CallInst>(&MI);
++        callsites.push_back(call);
++      }
++
++  for (auto* call : callsites) {
++    Function *callee = call->getCalledFunction();
++    LLVM_DEBUG(dbgs() << "callsite: " << *call << "\n");
++    LLVM_DEBUG(dbgs() << "IsColdCallsite: " << isColdCallSite(*call) << "\n");
++    if (callee) {
++      LLVM_DEBUG(dbgs() << "isFunctionEntryCold: " << isFunctionEntryCold(callee) << "\n");
++      LLVM_DEBUG(dbgs() << "isFunctionEntryHot: " << isFunctionEntryHot(callee) << "\n");
++    }
++
++    if (ColdCallsiteHotCallee) {
++      // if callsit is cold and callee is not indirect call and here we
++      // create another proxy function call
++      if (callee && isColdCallSite(*call) && isFunctionEntryHot(callee)) {
++        Function *NF = createProxyFunction(call, *F.getParent());
++        if (NF) {
++          markFunctionNoCallerSaved(*NF);
++          LLVM_DEBUG(dbgs() << "set no caller saved registers\n");
++          continue;
++        }
++      }
++    }
++
++    if (HotCallsiteColdCallee) {
++      if (call->isIndirectCall()) LLVM_DEBUG(dbgs() << "This is an indirect call!\n");
++      if (call->isIndirectCall() && isColdCallSite(*call)) {
++        Function *NF = createAndReplaceUsingProxyFunction(call, *F.getParent());
++        if (NF) {
++          markFunctionNoCallerSaved(*NF);
++          LLVM_DEBUG(dbgs() << "set no caller saved registers\n");
++          continue;
++        }
++      }
++    }
++  }
++}
++
++void FDOAttrModification::CallerToCallee(llvm::Function &F) {
++    
++}
++
++bool FDOAttrModification::runOnModule(Module &M) {
++  if (!initProfile()) return false;
++
++  for (auto &F : M) {
++    if (F.isDeclaration()) continue;
++    initBlockFreqInfo(&F);
++
++    if (UseCalleeReg) CalleeToCaller(F);
++    if (UseCallerReg) CallerToCallee(F);
++  }
++// if (NCSR_UseClone == false) 
++//     removeHotCallsiteCases(M);
++
++  if (OutputPSI != "off") dumpPSI(M, this, this);
++
++  LLVM_DEBUG(M.dump());
++  LLVM_DEBUG(llvm::verifyModule(M, &dbgs()));
++  return false;
++}
++
++
++// ---------------------------------------------
++
++// Old implementation for FullLTO only
++class FDOAttrModification2 : public ModulePass, public FDOQuery {
++ public:
++  FDOAttrModification2() : ModulePass(ID), FDOQuery(this) {}
++
++  StringRef getPassName() const override {
++    return "FDO based Attributes Modification Pass";
++  }
++
++  void getAnalysisUsage(AnalysisUsage &AU) const override {
++    ModulePass::getAnalysisUsage(AU);
++    AU.addRequired<ProfileSummaryInfoWrapperPass>();
++    AU.addRequired<BlockFrequencyInfoWrapperPass>();
++    AU.setPreservesAll();
++  }
++
++  void CalleeToCaller(llvm::Function &F);
++  void CallerToCallee(llvm::Function &F);
++
++  bool runOnModule(Module &M) override;
++
++ protected:
++  std::unordered_map<Function *, Function *> ClonedFuncs;
++  Function* getCloned(Function* F);
++  bool isHotCallee(llvm::Function* callee);
++  void removeHotCallsiteCases(Module& M);
++  static char ID;
++};
++
++char FDOAttrModification2::ID = 0;
++
++
++void FDOAttrModification2::CalleeToCaller(llvm::Function &F) {
++  // if this is a not hot function
++  if (OnHotEntryAndHotCallGraph) {
++    if (!isFunctionEntryHot(&F) && !isFunctionHotInCallGraph(&F)) return;
++  } else {
++    if (!isFunctionEntryHot(&F)) return;
++  }
++
++  LLVM_DEBUG(dbgs() << "caller has profile: " << F.getName() << "\n");
++  LLVM_DEBUG(dbgs() << "hot threshod = " << PSI->getHotCountThreshold() << "\n");
++  LLVM_DEBUG(dbgs() << "func addr: " << (&F.getFunction()) << "  func count: "
++                    << F.getFunction().getEntryCount()->getCount() << "\n");
++  LLVM_DEBUG(dbgs() << "hot caller: " << F.getName() << "\n");
++
++  SmallVector<CallInst*, 64> callsites;
++  findAllCallsite(F, callsites);
++
++  for (CallInst *call : callsites) {
++    Function *callee = call->getCalledFunction();
++    LLVM_DEBUG(dbgs() << "callsite: " << *call << "\n");
++    LLVM_DEBUG(dbgs() << "IsColdCallsite: " << isColdCallSite(*call) << "\n");
++    if (callee && !callee->isDeclaration()) {
++      LLVM_DEBUG(dbgs() << "isFunctionEntryCold: " << isFunctionEntryCold(callee) << "\n");
++      LLVM_DEBUG(dbgs() << "isFunctionEntryHot: " << isFunctionEntryHot(callee) << "\n");
++    }
++    if (ColdCallsiteColdCallee) {
++      if (callee && !callee->isDeclaration()) {
++        // if callee is cold on entry
++        if (isFunctionEntryCold(callee)) {
++          LLVM_DEBUG(dbgs() << "Adding attributes from hot " << F.getName()
++                            << " to cold " << callee->getName() << "\n");
++          markFunctionNoCallerSaved(*callee);
++          continue;
++        }
++      }
++    }
++
++    if (ColdCallsiteHotCallee) {
++      // if callsit is cold and callee is not indirect call and here we
++      // create another proxy function call
++      if (callee && isColdCallSite(*call) && isFunctionEntryHot(callee)) {
++        Function *NF = createProxyFunction(call, *F.getParent());
++        if (NF) {
++          markFunctionNoCallerSaved(*NF);
++          LLVM_DEBUG(dbgs() << "set no caller saved registers\n");
++          continue;
++        }
++      }
++    }
++
++    if (HotCallsiteColdCallee) {
++      if (call->isIndirectCall()) LLVM_DEBUG(dbgs() << "This is an indirect call!\n");
++      if (call->isIndirectCall() && isColdCallSite(*call)) {
++        Function *NF = createAndReplaceUsingProxyFunction(call, *F.getParent());
++        if (NF) {
++          markFunctionNoCallerSaved(*NF);
++          LLVM_DEBUG(dbgs() << "set no caller saved registers\n");
++          continue;
++        }
++      }
++    }
++
++    if (BasicIPRA) {
++      if (callee && !callee->isDeclaration()) { 
++        if (isLeafInCallGraph(callee)) 
++          markFunctionIPRALeaf(*callee);
++      }
++    }
++  }
++}
++
++Function* FDOAttrModification2::getCloned(Function* F) {
++  if (ClonedFuncs.find(F) != ClonedFuncs.end()) {
++    return ClonedFuncs[F];
++  } 
++  ValueToValueMapTy VMap;
++  Function* clone = CloneFunction(F, VMap);
++  clone->setName(F->getName() + ".clone");
++  ClonedFuncs[F] = clone; 
++  if (clone == nullptr) { return nullptr; }
++  markFunctionNoCalleeSaved(*clone);
++  return clone;
++}
++
++bool FDOAttrModification2::isHotCallee(llvm::Function* callee) {
++  if (OnHotEntryAndHotCallGraph)
++    if (isFunctionEntryHot(callee) || isFunctionHotInCallGraph(callee)) return true;
++  else
++    if (isFunctionEntryHot(callee)) return true;
++}
++
++void FDOAttrModification2::CallerToCallee(llvm::Function &F) {
++  SmallVector<CallInst*, 64> callsites;
++  findAllCallsite(F, callsites);
++
++  for (CallInst *call : callsites) 
++    if (ColdCallsiteHotCallee) 
++      if (isColdCallSite(*call)) {
++        Function *callee = call->getCalledFunction();
++        if (callee && !callee->isDeclaration() && isHotCallee(callee)) {
++          if (NCSR_UseClone) {
++            Function* clone = getCloned(callee);
++            if (clone) call->setCalledFunction(clone);
++          } else {
++            markFunctionNoCalleeSaved(*callee);
++          }
++        }
++      }
++}
++
++static void changeDWARFforFunction(Function &F) {
++  if (!F.hasMetadata("dbg")) return;
++  auto* metadata = F.getMetadata("dbg");
++  auto* node = dyn_cast<DISubprogram>(metadata);
++  if (node) {
++    // if (node->getNumOperands() >= 3) {
++    //   node->replaceLinkageName(MDString::get(F.getContext(), "_Z15no_caller_savedv"));
++    // }
++    node->replaceOperandWith(2, MDString::get(F.getContext(), F.getName().str()+"(clone)"));
++  }
++}
++
++void FDOAttrModification2::removeHotCallsiteCases(Module& M) {
++  for (auto &F : M) {
++    if (F.isDeclaration()) continue;
++    SmallVector<CallInst*, 64> callsites;
++    findAllCallsite(F, callsites);
++    for (CallInst *call : callsites) 
++      if (!isColdCallSite(*call)) {
++        Function *callee = call->getCalledFunction();
++        if (callee && !callee->isDeclaration() && isHotCallee(callee)) 
++          if (callee->hasFnAttribute("no_callee_saved_registers")) 
++            callee->removeFnAttr("no_callee_saved_registers");
++      }
++  }
++}
++
++bool FDOAttrModification2::runOnModule(Module &M) {
++  if (!initProfile()) return false;
++
++  for (auto &F : M) {
++    if (F.isDeclaration()) continue;
++    initBlockFreqInfo(&F);
++
++    if (UseCalleeReg) CalleeToCaller(F);
++    if (UseCallerReg) CallerToCallee(F);
++
++    if (ChangeDWARF) changeDWARFforFunction(F);
++  }
++
++  if (NCSR_UseClone == false) 
++    removeHotCallsiteCases(M);
++
++  if (OutputPSI != "off") dumpPSI(M, this, this);
++
++  LLVM_DEBUG(M.dump());
++  LLVM_DEBUG(llvm::verifyModule(M, &dbgs()));
++  return false;
++}
++
++
++
++Pass *createFDOAttrModificationPass() { 
++  if (UseNewImpl)
++    return new FDOAttrModification(); 
++  else 
++    return new FDOAttrModification2();
++}
++
++class FDORegisterInfoCollector : public ModulePass {
++public:
++  FDORegisterInfoCollector() : ModulePass(ID) {}
++protected:
++  static char ID;
++};
++
++char FDORegisterInfoCollector::ID = 0;
++
++
++class FDORegisterMaskPropagator : public ModulePass {
++public:
++  FDORegisterMaskPropagator() : ModulePass(ID) {}
++
++protected:
++  static char ID;
++};
++
++char FDORegisterMaskPropagator::ID = 0;
++
++
++}   // namespace llvm
+diff --git a/llvm/lib/CodeGen/TargetPassConfig.cpp b/llvm/lib/CodeGen/TargetPassConfig.cpp
+index 32fa6cc17d53..1a96fdd1ac66 100644
+--- a/llvm/lib/CodeGen/TargetPassConfig.cpp
++++ b/llvm/lib/CodeGen/TargetPassConfig.cpp
+@@ -376,6 +376,11 @@ struct InsertedPass {
+ namespace llvm {
+ 
+ extern cl::opt<bool> EnableFSDiscriminator;
++extern Pass* createFDOAttrModificationPass();
++
++static cl::opt<bool> FDO_IPRA("fdo-ipra", cl::Hidden, cl::init(false), cl::desc("Enable FDO-based IPRA"));
++extern cl::opt<std::string> MapOutput;
++extern MachineFunctionPass *createMapBBIndexPass();
+ 
+ class PassConfigImpl {
+ public:
+@@ -881,6 +886,10 @@ void TargetPassConfig::addIRPasses() {
+   if (TM->getTargetTriple().isOSBinFormatMachO())
+     addPass(createLowerGlobalDtorsLegacyPass());
+ 
++  if (FDO_IPRA) {
++    addPass(createFDOAttrModificationPass());
++  }
++
+   // Make sure that no unreachable blocks are instruction selected.
+   addPass(createUnreachableBlockEliminationPass());
+ 
+@@ -1277,6 +1286,10 @@ void TargetPassConfig::addMachinePasses() {
+   // Add passes that directly emit MI after all other MI passes.
+   addPreEmitPass2();
+ 
++  // print bbidx map
++  if (!MapOutput.empty())
++    addPass(createMapBBIndexPass());
++
+   AddingMachinePasses = false;
+ }
+ 
+diff --git a/llvm/lib/Target/X86/CMakeLists.txt b/llvm/lib/Target/X86/CMakeLists.txt
+index 5eba6db5b06e..472f63e41cb9 100644
+--- a/llvm/lib/Target/X86/CMakeLists.txt
++++ b/llvm/lib/Target/X86/CMakeLists.txt
+@@ -26,6 +26,8 @@ endif()
+ add_public_tablegen_target(X86CommonTableGen)
+ 
+ set(sources
++  CountPushPop.cpp
++  RegProfiler.cpp
+   X86ArgumentStackSlotRebase.cpp
+   X86AsmPrinter.cpp
+   X86AvoidTrailingCall.cpp
+diff --git a/llvm/lib/Target/X86/CountPushPop.cpp b/llvm/lib/Target/X86/CountPushPop.cpp
+new file mode 100644
+index 000000000000..501754712300
+--- /dev/null
++++ b/llvm/lib/Target/X86/CountPushPop.cpp
+@@ -0,0 +1,181 @@
++#include "MCTargetDesc/X86MCTargetDesc.h"
++#include "X86InstrBuilder.h"
++#include "X86InstrInfo.h"
++#include "llvm/ADT/Statistic.h"
++#include "llvm/Analysis/ProfileSummaryInfo.h"
++#include "llvm/CodeGen/LazyMachineBlockFrequencyInfo.h"
++#include "llvm/InitializePasses.h"
++#include "llvm/Option/ArgList.h"
++#include "llvm/Support/CommandLine.h"
++
++#include <string>
++#include <fstream>
++
++#define DEBUG_TYPE "count-push-pop"
++
++llvm::cl::opt<std::string>
++    EnableCPPP("count-push-pop", llvm::cl::Hidden, llvm::cl::init("off"),
++      llvm::cl::ValueOptional, llvm::cl::desc("Enable counting push and pop"));
++
++
++// This is a txt file that contains the function name, then a pair of basic block id - count
++llvm::cl::opt<std::string>
++  UsePerfdata("use-perfdata", llvm::cl::Hidden, llvm::cl::init(""),
++           llvm::cl::ValueOptional, llvm::cl::desc("Enable perfdata push pop counting"));
++
++
++namespace llvm {
++
++static std::mutex g_file_mutex;
++
++struct Counts {
++  uint64_t Push = 0;
++  uint64_t Pop = 0;
++  uint64_t StaticPush = 0;
++  uint64_t StaticPop = 0;
++  uint64_t Spill = 0;
++  uint64_t Restore = 0;
++  uint64_t StaticSpill = 0;
++  uint64_t StaticRestore = 0;
++};
++
++class CountPushPop : public MachineFunctionPass {
++public:
++  static char ID;
++  CountPushPop() : MachineFunctionPass(ID) {}
++
++  bool runOnMachineFunction(MachineFunction &MF) override {
++    // printf("run on function %s\n", MF.getName().str().c_str());
++    auto PSI = &getAnalysis<ProfileSummaryInfoWrapperPass>().getPSI();
++    auto MBFI = (PSI && PSI->hasProfileSummary())
++                    ? &getAnalysis<LazyMachineBlockFrequencyInfoPass>().getBFI()
++                    : nullptr;
++    const auto &TII = *MF.getSubtarget().getInstrInfo();
++    for (auto &MBB : MF) {
++      auto p = MBFI->getBlockProfileCount(&MBB);
++      for (auto &MI : MBB) {
++        if (MI.getOpcode() == X86::PUSH64r) {
++          if (MBFI && p) pgo.Push += p.value();
++          pgo.StaticPush += 1;
++        } else if (MI.getOpcode() == X86::POP64r) {
++          if (MBFI && p) pgo.Pop += p.value();
++          pgo.StaticPop += 1;
++        }
++        std::optional<unsigned> Size;
++        if (Size = MI.getSpillSize(&TII)) {
++          if (MBFI && p) pgo.Spill += p.value() * Size.value();
++          pgo.StaticSpill += Size.value();
++        } else if (Size = MI.getRestoreSize(&TII)) {
++          if (MBFI && p) pgo.Restore += p.value() * Size.value();
++          pgo.StaticRestore += Size.value();
++        }
++      }
++    }
++
++    if (UsePerfdata != "") {
++      if (PerfData.count(MF.getName().str())) {
++        auto& m = PerfData[MF.getName().str()];
++        for (auto &MBB : MF) {
++          auto p  = m.find(MBB.getNumber());
++          if (p != m.end())
++            for (auto &MI : MBB) {
++              if (MI.getOpcode() == X86::PUSH64r) {
++                perf.Push += p->second;
++              } else if (MI.getOpcode() == X86::POP64r) {
++                perf.Pop += p->second;
++              }
++              std::optional<unsigned> Size;
++              if (Size = MI.getSpillSize(&TII)) {
++                perf.Spill += p->second * Size.value();
++              } else if (Size = MI.getRestoreSize(&TII)) {
++                perf.Restore += p->second * Size.value();
++              }
++            }
++        }
++      }
++    }
++
++    return false;
++  }
++
++  Counts pgo, perf;
++
++  std::map<std::string, std::map<uint64_t, uint64_t>> PerfData;
++
++  bool doInitialization(Module &M) override {
++
++    if (UsePerfdata != "") {
++      std::ifstream infile(UsePerfdata);
++      uint64_t count;
++      infile >> count;
++      for (uint64_t i = 0; i < count; i++) {
++        std::string func_name;
++        infile >> func_name;
++        uint64_t bb_count;
++        infile >> bb_count;
++        PerfData[func_name] = std::map<uint64_t, uint64_t>();
++        for (uint64_t j = 0; j < bb_count; j++) {
++          uint64_t bb_id;
++          uint64_t bb_count;
++          infile >> bb_id;
++          infile >> bb_count;
++          PerfData[func_name][bb_id] = bb_count;
++        }
++      }
++    }
++
++    return false;
++  }
++
++  bool doFinalization(Module &M) override {
++    std::lock_guard<std::mutex> guard(g_file_mutex);
++    std::string path = EnableCPPP;
++    if (path.empty())
++      path = "/tmp/count-push-pop.txt";
++    FILE *pOut = fopen(path.c_str(), "a");
++    if (pOut) {
++      fprintf(pOut, "Using PGO profile counting in %s\n", M.getName().str().c_str());
++      fprintf(pOut, "dynamic push count: %zu\n", pgo.Push);
++      fprintf(pOut, "dynamic pop  count: %zu\n", pgo.Pop);
++      fprintf(pOut, "static  push count: %zu\n", pgo.StaticPush);
++      fprintf(pOut, "static  pop  count: %zu\n", pgo.StaticPop);
++      fprintf(pOut, "dynamic spill  (B): %zu\n", pgo.Spill);
++      fprintf(pOut, "dynamic reload (B): %zu\n", pgo.Restore);
++      fprintf(pOut, "static  spill  (B): %zu\n", pgo.StaticSpill);
++      fprintf(pOut, "static  reload (B): %zu\n", pgo.StaticRestore);
++
++      if (UsePerfdata != "") {
++        fprintf(pOut, "Using perfdata counting in perfdata %s\n", UsePerfdata.c_str()); 
++        fprintf(pOut, "perf push count: %zu\n", perf.Push);
++        fprintf(pOut, "perf pop  count: %zu\n", perf.Pop);
++        fprintf(pOut, "perf spill  (B): %zu\n", perf.Spill);
++        fprintf(pOut, "perf reload (B): %zu\n", perf.Restore);
++      }
++      fclose(pOut);
++    }
++    return false;
++  }
++
++  void getAnalysisUsage(AnalysisUsage &AU) const override {
++    AU.addRequired<ProfileSummaryInfoWrapperPass>();
++    AU.addRequired<LazyMachineBlockFrequencyInfoPass>();
++    AU.setPreservesAll();
++    MachineFunctionPass::getAnalysisUsage(AU);
++  }
++};
++} // namespace llvm
++
++char llvm::CountPushPop::ID = 0;
++static llvm::RegisterPass<llvm::CountPushPop> X("push-pop-counter",
++                                                "Count Push/Pop Pass");
++
++llvm::MachineFunctionPass *createCountPushPopPass() {
++  return new llvm::CountPushPop();
++}
++
++// INITIALIZE_PASS_BEGIN(CountPushPop, DEBUG_TYPE,
++//                       "Count Push and Pop Actions", true, true)
++// INITIALIZE_PASS_DEPENDENCY(PEI)
++// INITIALIZE_PASS_DEPENDENCY(MachineBlockFrequencyInfo)
++// INITIALIZE_PASS_END(CountPushPop, DEBUG_TYPE,
++//                     "Count Push and Pop Actions", true, true)
+diff --git a/llvm/lib/Target/X86/RegProfiler.cpp b/llvm/lib/Target/X86/RegProfiler.cpp
+new file mode 100644
+index 000000000000..0dc8a5d39b57
+--- /dev/null
++++ b/llvm/lib/Target/X86/RegProfiler.cpp
+@@ -0,0 +1,235 @@
++#include "MCTargetDesc/X86MCTargetDesc.h"
++#include "X86InstrBuilder.h"
++#include "X86InstrInfo.h"
++#include "llvm/ADT/Statistic.h"
++#include "llvm/Analysis/ProfileSummaryInfo.h"
++#include "llvm/CodeGen/LazyMachineBlockFrequencyInfo.h"
++#include "llvm/InitializePasses.h"
++#include "llvm/Option/ArgList.h"
++#include "llvm/Support/CommandLine.h"
++#include "llvm/Support/Debug.h"
++#include "llvm/IR/GlobalValue.h"
++#include <string>
++#include <fstream>
++
++#define DEBUG_TYPE "reg-profiler"
++
++llvm::cl::opt<bool>
++  EnablePPP("EnablePushPopProfile", llvm::cl::Hidden, llvm::cl::init(false),
++            llvm::cl::ValueOptional, llvm::cl::desc("Enable counting push and pop"));
++
++llvm::cl::opt<bool>
++  EnableSBP("EnableSpillBytesProfile", llvm::cl::Hidden, llvm::cl::init(false),
++            llvm::cl::ValueOptional, llvm::cl::desc("Enable counting spill bytes"));
++
++namespace llvm {
++
++struct PPCounts {
++  uint64_t Push = 0;
++  uint64_t Pop = 0;
++  uint64_t StaticPush = 0;
++  uint64_t StaticPop = 0;
++};
++
++struct SBCounts {
++  uint64_t Spill = 0;
++  uint64_t Reload = 0;
++  uint64_t StaticSpill = 0;
++  uint64_t StaticReload = 0;
++};
++
++static std::vector<MachineInstr*> getCallsites(MachineBasicBlock &MBB) {
++  std::vector<MachineInstr*> res;
++  for (auto &MI : MBB) 
++    if (MI.isCall()) res.push_back(&MI);
++  return res;
++}
++
++static bool IsPrologue(MachineBasicBlock &MBB) {
++  return &MBB == &MBB.getParent()->front();
++}
++
++class InstrumentRegProfilerPass : public MachineFunctionPass {
++public:
++  static char ID;
++  llvm::GlobalValue *SpillReg, *Spill, *Reload, *Push, *Pop;
++
++  llvm::GlobalValue *SpillInCallSite, *ReloadInCallSite;
++  llvm::GlobalValue *SpillInCallSiteForNCeSR, *ReloadInCallSiteForNCeSR;
++  llvm::GlobalValue *SpillInCallSiteForNCrSR, *ReloadInCallSiteForNCrSR;
++
++  llvm::GlobalValue *SpillInPrologue, *ReloadInPrologue;
++  llvm::GlobalValue *SpillInPrologueForNCeSR, *ReloadInPrologueForNCeSR;
++  llvm::GlobalValue *SpillInPrologueForNCrSR, *ReloadInPrologueForNCrSR;
++
++  llvm::GlobalValue *MemoryLoad, *MemoryStore;
++
++  InstrumentRegProfilerPass() : MachineFunctionPass(ID) {}
++
++  bool runOnMachineFunction(MachineFunction &MF) override {
++    LLVM_DEBUG(dbgs() << "Reg profiler run on function " << MF.getName() << "\n");
++    LLVM_DEBUG(MF.getFunction().print(dbgs()));
++    LLVM_DEBUG(MF.print(dbgs()));
++    const auto &TII = *MF.getSubtarget().getInstrInfo();
++    llvm::GlobalValue* vars[4] = {Push, Pop, Spill, Reload};
++    const unsigned push = 0, pop = 1, spill = 2, reload = 3;
++
++    llvm::GlobalValue* cvars[12] = {
++        SpillInCallSite, ReloadInCallSite, SpillInCallSiteForNCeSR, ReloadInCallSiteForNCeSR, SpillInCallSiteForNCrSR, ReloadInCallSiteForNCrSR,
++        SpillInPrologue, ReloadInPrologue, SpillInPrologueForNCeSR, ReloadInPrologueForNCeSR, SpillInPrologueForNCrSR, ReloadInPrologueForNCrSR};
++    const unsigned sic = 0, ric = 1, sicNCeSR = 2, ricNCeSR = 3, sicNCrSR = 4, ricNCrSR = 5;
++    const unsigned sip = 6, rip = 7, sipNCeSR = 8, ripNCeSR = 9, sipNCrSR = 10, ripNCrSR = 11;
++
++    for (auto &MBB : MF) {
++      unsigned count[4] = {0, 0, 0, 0};
++      for (auto &MI : MBB) {
++        if (EnablePPP) {
++          if (MI.getOpcode() == X86::PUSH64r) {
++            count[push]++;
++          } else if (MI.getOpcode() == X86::POP64r) {
++            count[pop]++;
++          } 
++        } 
++        if (EnableSBP) {
++          std::optional<unsigned> Size;
++          if (Size = MI.getSpillSize(&TII)) {
++            LLVM_DEBUG(dbgs() << "SpillInst: ";  MI.print(dbgs()));
++            count[spill] += Size.value();
++          } else if (Size = MI.getRestoreSize(&TII)) {
++            LLVM_DEBUG(dbgs() << "ReloadInst: ";  MI.print(dbgs()));
++            count[reload] += Size.value();
++          }
++        }
++      }
++      if (count[push] == 0 && count[pop] == 0 && count[spill] == 0 && count[reload] == 0) continue;
++      
++
++      unsigned ccount[12] = {0,0,0,0,0,0,0,0,0,0,0,0};
++      auto callsites = getCallsites(MBB);
++      if (callsites.size() > 0) {
++        bool hasNCeSR = false, hasNCrSR = false;
++        for (auto* MI : callsites) {
++          auto op = MI->getOperand(0);
++          if (!op.isGlobal() || !isa<Function>(op.getGlobal())) continue;
++          auto* callee = dyn_cast<Function>(op.getGlobal());
++          if (callee->hasFnAttribute("no_caller_saved_registers")) hasNCrSR = true;
++          if (callee->hasFnAttribute("no_callee_saved_registers")) hasNCeSR = true;
++        }
++        if (hasNCeSR) {
++          ccount[sicNCeSR] = count[spill];
++          ccount[ricNCeSR] = count[reload];
++        }
++        if (hasNCrSR) {
++          ccount[sicNCrSR] = count[spill];
++          ccount[ricNCrSR] = count[reload];
++        }
++        ccount[sic] = count[spill];
++        ccount[ric] = count[reload];
++      }
++
++
++      if (IsPrologue(MBB)) {
++        Function& F = MF.getFunction();        
++        if (F.hasFnAttribute("no_caller_saved_registers")) {
++          ccount[sipNCrSR] = count[spill];
++          ccount[ripNCrSR] = count[reload];
++        }
++        if (F.hasFnAttribute("no_callee_saved_registers")) {
++          ccount[sipNCeSR] = count[spill];
++          ccount[ripNCeSR] = count[reload];
++        }
++        ccount[sip] = count[spill];
++        ccount[rip] = count[reload];
++      }
++
++      auto dbgLoc = MBB.begin()->getDebugLoc();
++      auto it = MBB.begin();
++
++      // spill rax
++      MBB.insert(it, BuildMI(MF, dbgLoc, TII.get(X86::MOV64mr))
++        .addReg(0).addImm(1).addReg(0).addGlobalAddress(SpillReg, 0, X86II::MO_TPOFF).addReg(X86::FS).addReg(X86::RAX));
++
++      // here add the profiling code for profiling
++      for (int i = 0; i < 4; ++i) {
++        if (count[i] == 0) continue;
++
++        MBB.insert(it, BuildMI(MF, dbgLoc, TII.get(X86::MOV64rm), X86::RAX)
++          .addReg(0).addImm(1).addReg(0).addGlobalAddress(vars[i], 0, X86II::MO_TPOFF).addReg(X86::FS));
++        MBB.insert(it, BuildMI(MF, dbgLoc, TII.get(X86::LEA64r), X86::RAX)
++          .addReg(/*Base*/ X86::RAX).addImm(/*Scale*/ 1).addReg(/*Index*/ 0).addImm(/*Disp*/ count[i]).addReg(/*Segment*/ 0));
++        MBB.insert(it, BuildMI(MF, dbgLoc, TII.get(X86::MOV64mr))
++          .addReg(0).addImm(1).addReg(0).addGlobalAddress(vars[i], 0, X86II::MO_TPOFF).addReg(X86::FS).addReg(X86::RAX));
++      }
++
++      for (int i = 0; i < 12; ++i) {
++        if (ccount[i] == 0) continue;
++
++        MBB.insert(it, BuildMI(MF, dbgLoc, TII.get(X86::MOV64rm), X86::RAX)
++          .addReg(0).addImm(1).addReg(0).addGlobalAddress(cvars[i], 0, X86II::MO_TPOFF).addReg(X86::FS));
++        MBB.insert(it, BuildMI(MF, dbgLoc, TII.get(X86::LEA64r), X86::RAX)
++          .addReg(/*Base*/ X86::RAX).addImm(/*Scale*/ 1).addReg(/*Index*/ 0).addImm(/*Disp*/ ccount[i]).addReg(/*Segment*/ 0));
++        MBB.insert(it, BuildMI(MF, dbgLoc, TII.get(X86::MOV64mr))
++          .addReg(0).addImm(1).addReg(0).addGlobalAddress(cvars[i], 0, X86II::MO_TPOFF).addReg(X86::FS).addReg(X86::RAX));
++      }
++
++      // reload rax
++      MBB.insert(it, BuildMI(MF, dbgLoc, TII.get(X86::MOV64rm), X86::RAX)
++        .addReg(0).addImm(1).addReg(0).addGlobalAddress(SpillReg, 0, X86II::MO_TPOFF).addReg(X86::FS));
++    }
++    LLVM_DEBUG(MF.print(dbgs()));
++    return true;
++  }
++
++  bool doInitialization(Module &M) override {
++    SpillReg = dyn_cast<GlobalValue>(M.getOrInsertGlobal("__LLVM_IRPP_SpillReg", Type::getInt64Ty(M.getContext())));
++    Spill = dyn_cast<GlobalValue>(M.getOrInsertGlobal("__LLVM_IRPP_Spill", Type::getInt64Ty(M.getContext())));
++    Reload = dyn_cast<GlobalValue>(M.getOrInsertGlobal("__LLVM_IRPP_Reload", Type::getInt64Ty(M.getContext())));
++    Push = dyn_cast<GlobalValue>(M.getOrInsertGlobal("__LLVM_IRPP_Push", Type::getInt64Ty(M.getContext())));
++    Pop = dyn_cast<GlobalValue>(M.getOrInsertGlobal("__LLVM_IRPP_Pop", Type::getInt64Ty(M.getContext())));
++
++    SpillInCallSite = dyn_cast<GlobalValue>(M.getOrInsertGlobal("__LLVM_IRPP_SpillInCallSite", Type::getInt64Ty(M.getContext())));
++    ReloadInCallSite = dyn_cast<GlobalValue>(M.getOrInsertGlobal("__LLVM_IRPP_ReloadInCallSite", Type::getInt64Ty(M.getContext())));
++    SpillInCallSiteForNCeSR = dyn_cast<GlobalValue>(M.getOrInsertGlobal("__LLVM_IRPP_SpillInCallSiteForNCeSR", Type::getInt64Ty(M.getContext())));
++    ReloadInCallSiteForNCeSR = dyn_cast<GlobalValue>(M.getOrInsertGlobal("__LLVM_IRPP_ReloadInCallSiteForNCeSR", Type::getInt64Ty(M.getContext())));
++    SpillInCallSiteForNCrSR = dyn_cast<GlobalValue>(M.getOrInsertGlobal("__LLVM_IRPP_SpillInCallSiteForNCrSR", Type::getInt64Ty(M.getContext())));
++    ReloadInCallSiteForNCrSR = dyn_cast<GlobalValue>(M.getOrInsertGlobal("__LLVM_IRPP_ReloadInCallSiteForNCrSR", Type::getInt64Ty(M.getContext())));
++    SpillInPrologue = dyn_cast<GlobalValue>(M.getOrInsertGlobal("__LLVM_IRPP_SpillInPrologue", Type::getInt64Ty(M.getContext())));
++    ReloadInPrologue = dyn_cast<GlobalValue>(M.getOrInsertGlobal("__LLVM_IRPP_ReloadInPrologue", Type::getInt64Ty(M.getContext())));
++    SpillInPrologueForNCeSR = dyn_cast<GlobalValue>(M.getOrInsertGlobal("__LLVM_IRPP_SpillInPrologueForNCeSR", Type::getInt64Ty(M.getContext())));
++    ReloadInPrologueForNCeSR = dyn_cast<GlobalValue>(M.getOrInsertGlobal("__LLVM_IRPP_ReloadInPrologueForNCeSR", Type::getInt64Ty(M.getContext())));
++    SpillInPrologueForNCrSR = dyn_cast<GlobalValue>(M.getOrInsertGlobal("__LLVM_IRPP_SpillInPrologueForNCrSR", Type::getInt64Ty(M.getContext())));
++    ReloadInPrologueForNCrSR = dyn_cast<GlobalValue>(M.getOrInsertGlobal("__LLVM_IRPP_ReloadInPrologueForNCrSR", Type::getInt64Ty(M.getContext())));
++
++    MemoryLoad = dyn_cast<GlobalValue>(M.getOrInsertGlobal("__LLVM_IRPP_MemoryLoad", Type::getInt64Ty(M.getContext())));
++    MemoryStore = dyn_cast<GlobalValue>(M.getOrInsertGlobal("__LLVM_IRPP_MemoryStore", Type::getInt64Ty(M.getContext())));
++    return true;
++  }
++
++  // bool doInitialization(Module &M) override {
++  //   auto Ty = Type::getInt64Ty(M.getContext());
++  //   auto createGlobal = [&M, Ty](StringRef name) {
++  //     return dyn_cast<GlobalValue>(M.getOrInsertGlobal(name, Ty, [=] {
++  //       return new GlobalVariable(Ty, false, GlobalVariable::ExternalLinkage,
++  //                               nullptr, name, GlobalValue::ThreadLocalMode::GeneralDynamicTLSModel);
++  //     }));
++  //   };
++  //   Spill = createGlobal("__LLVM_IRPP_Spill");
++  //   Reload = createGlobal("__LLVM_IRPP_Reload");
++  //   Push = createGlobal("__LLVM_IRPP_Push");
++  //   Pop = createGlobal("__LLVM_IRPP_Pop");
++  //   return true;
++  // }
++
++  bool doFinalization(Module &M) override {
++    return false;
++  }
++};
++} // namespace llvm
++
++char llvm::InstrumentRegProfilerPass::ID = 0;
++static llvm::RegisterPass<llvm::InstrumentRegProfilerPass> X("instrument-reg-profiler",
++                                                "Instrument reg profiler pass");
++
++llvm::MachineFunctionPass *createInstrumentRegProfilerPassPass() {
++  return new llvm::InstrumentRegProfilerPass();
++}
+diff --git a/llvm/lib/Target/X86/X86ISelLowering.cpp b/llvm/lib/Target/X86/X86ISelLowering.cpp
+index 62cbc8bc128f..2609c6eac0f7 100644
+--- a/llvm/lib/Target/X86/X86ISelLowering.cpp
++++ b/llvm/lib/Target/X86/X86ISelLowering.cpp
+@@ -3553,6 +3553,17 @@ static SDValue lowerRegToMasks(const SDValue &ValArg, const EVT &ValVT,
+   return DAG.getBitcast(ValVT, ValReturned);
+ }
+ 
++
++static void removeUsedRegisters(llvm::Register Reg, const TargetRegisterInfo *TRI, uint32_t *RegMask) {
++  for (MCSubRegIterator SubRegs(Reg, TRI, /*IncludeSelf=*/true);
++        SubRegs.isValid(); ++SubRegs)
++    RegMask[*SubRegs / 32] &= ~(1u << (*SubRegs % 32));
++  for (MCSuperRegIterator SuperRegs(Reg, TRI, /*IncludeSelf=*/false);
++        SuperRegs.isValid(); ++SuperRegs)
++    RegMask[*SuperRegs / 32] &= ~(1u << (*SuperRegs % 32));
++}
++
++
+ /// Lower the result values of a call into the
+ /// appropriate copies out of appropriate physical registers.
+ ///
+@@ -3578,9 +3589,7 @@ SDValue X86TargetLowering::LowerCallResult(
+     // In some calling conventions we need to remove the used registers
+     // from the register mask.
+     if (RegMask) {
+-      for (MCSubRegIterator SubRegs(VA.getLocReg(), TRI, /*IncludeSelf=*/true);
+-           SubRegs.isValid(); ++SubRegs)
+-        RegMask[*SubRegs / 32] &= ~(1u << (*SubRegs % 32));
++      removeUsedRegisters(VA.getLocReg(), TRI, RegMask);
+     }
+ 
+     // Report an error if there was an attempt to return FP values via XMM
+@@ -4897,7 +4906,7 @@ X86TargetLowering::LowerCall(TargetLowering::CallLoweringInfo &CLI,
+     // use X86_INTR calling convention because it has the same CSR mask
+     // (same preserved registers).
+     if (HasNCSR)
+-      AdaptedCC = (CallingConv::ID)CallingConv::X86_INTR;
++      AdaptedCC = (CallingConv::ID)CallingConv::X86_GP_INTR;
+     // If NoCalleeSavedRegisters is requested, than use GHC since it happens
+     // to use the CSR_NoRegs_RegMask.
+     if (CB && CB->hasFnAttr("no_callee_saved_registers"))
+@@ -4940,10 +4949,9 @@ X86TargetLowering::LowerCall(TargetLowering::CallLoweringInfo &CLI,
+     // Make sure all sub registers of the argument registers are reset
+     // in the RegMask.
+     if (ShouldDisableArgRegs) {
+-      for (auto const &RegPair : RegsToPass)
+-        for (MCSubRegIterator SubRegs(RegPair.first, TRI, /*IncludeSelf=*/true);
+-             SubRegs.isValid(); ++SubRegs)
+-          RegMask[*SubRegs / 32] &= ~(1u << (*SubRegs % 32));
++      for (auto const &RegPair : RegsToPass) {
++        removeUsedRegisters(RegPair.first, TRI, RegMask);
++      }
+     }
+ 
+     // Create the RegMask Operand according to our updated mask.
+@@ -5023,6 +5031,11 @@ X86TargetLowering::LowerCall(TargetLowering::CallLoweringInfo &CLI,
+     InGlue = Chain.getValue(1);
+   }
+ 
++  if (RegMask && Outs.size() > 0 && Outs[0].Flags.isSRet()) {
++    const TargetRegisterInfo *TRI = Subtarget.getRegisterInfo();
++    removeUsedRegisters(X86::RAX, TRI, RegMask);
++  }
++
+   // Handle result values, copying them out of physregs into vregs that we
+   // return.
+   return LowerCallResult(Chain, InGlue, CallConv, isVarArg, Ins, dl, DAG,
+diff --git a/llvm/lib/Target/X86/X86RegisterInfo.cpp b/llvm/lib/Target/X86/X86RegisterInfo.cpp
+index 9898ce20e5ac..2c71914880c0 100644
+--- a/llvm/lib/Target/X86/X86RegisterInfo.cpp
++++ b/llvm/lib/Target/X86/X86RegisterInfo.cpp
+@@ -290,12 +290,12 @@ X86RegisterInfo::getCalleeSavedRegs(const MachineFunction *MF) const {
+   // If attribute NoCallerSavedRegisters exists then we set X86_INTR calling
+   // convention because it has the CSR list.
+   if (MF->getFunction().hasFnAttribute("no_caller_saved_registers"))
+-    CC = CallingConv::X86_INTR;
++    CC = CallingConv::X86_GP_INTR;
+ 
+   // If atribute specified, override the CSRs normally specified by the
+   // calling convention and use the empty set instead.
+   if (MF->getFunction().hasFnAttribute("no_callee_saved_registers"))
+-    return CSR_NoRegs_SaveList;
++    return CSR_64_CXX_TLS_Darwin_PE_SaveList;
+ 
+   switch (CC) {
+   case CallingConv::GHC:
+@@ -380,6 +380,9 @@ X86RegisterInfo::getCalleeSavedRegs(const MachineFunction *MF) const {
+         return CSR_32_AllRegs_SSE_SaveList;
+       return CSR_32_AllRegs_SaveList;
+     }
++  case CallingConv::X86_GP_INTR:
++    assert(Is64Bit && "X86_GP_INTR calling convention only used on 64-bit X86");
++    return CSR_64_AllRegs_NoSSE_SaveList;
+   default:
+     break;
+   }
+@@ -418,6 +421,9 @@ X86RegisterInfo::getCallPreservedMask(const MachineFunction &MF,
+   bool HasAVX = Subtarget.hasAVX();
+   bool HasAVX512 = Subtarget.hasAVX512();
+ 
++  if (MF.getFunction().hasFnAttribute("no_callee_saved_registers"))
++    return CSR_64_CXX_TLS_Darwin_PE_RegMask; //CSR_NoRegs_SaveList;
++
+   switch (CC) {
+   case CallingConv::GHC:
+   case CallingConv::HiPE:
+@@ -496,6 +502,8 @@ X86RegisterInfo::getCallPreservedMask(const MachineFunction &MF,
+         return CSR_32_AllRegs_SSE_RegMask;
+       return CSR_32_AllRegs_RegMask;
+     }
++  case CallingConv::X86_GP_INTR:
++    return CSR_64_AllRegs_NoSSE_RegMask;
+   default:
+     break;
+   }
+@@ -914,6 +922,10 @@ unsigned X86RegisterInfo::findDeadCallerSavedReg(
+   if (MBBI == MBB.end())
+     return 0;
+ 
++  if (MBB.getParent()->getFunction().hasFnAttribute("no_caller_saved_registers")) {
++    return 0;
++  }
++
+   switch (MBBI->getOpcode()) {
+   default:
+     return 0;
+diff --git a/llvm/lib/Target/X86/X86TargetMachine.cpp b/llvm/lib/Target/X86/X86TargetMachine.cpp
+index a8895453c14a..65341a55436e 100644
+--- a/llvm/lib/Target/X86/X86TargetMachine.cpp
++++ b/llvm/lib/Target/X86/X86TargetMachine.cpp
+@@ -56,6 +56,12 @@
+ 
+ using namespace llvm;
+ 
++extern MachineFunctionPass* createCountPushPopPass();
++extern cl::opt<std::string> EnableCPPP;
++
++extern MachineFunctionPass* createInstrumentRegProfilerPassPass();
++extern cl::opt<bool> EnablePPP, EnableSBP;
++
+ static cl::opt<bool> EnableMachineCombinerPass("x86-machine-combiner",
+                                cl::desc("Enable the machine combiner pass"),
+                                cl::init(true), cl::Hidden);
+@@ -622,6 +628,12 @@ void X86PassConfig::addPreEmitPass2() {
+   // Insert pseudo probe annotation for callsite profiling
+   addPass(createPseudoProbeInserter());
+ 
++  // Add count push pop pass for study the register savings
++  if (EnableCPPP != "off") addPass(createCountPushPopPass());
++
++  // Add instrument register profiler pass
++  if (EnablePPP || EnableSBP) addPass(createInstrumentRegProfilerPassPass());
++
+   // KCFI indirect call checks are lowered to a bundle, and on Darwin platforms,
+   // also CALL_RVMARKER.
+   addPass(createUnpackMachineBundles([&TT](const MachineFunction &MF) {

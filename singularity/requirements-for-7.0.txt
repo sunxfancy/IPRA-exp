@@ -1,0 +1,30 @@
+# Platform-specific components
+pypiwin32>=223; sys_platform == "win32" and python_version > "3"
+pywin32>=225; sys_platform == "win32" and python_version > "3"
+
+cryptography == 2.3; platform_machine == "s390x" or platform_machine == "ppc64le" # Needed for oauthlib to use RSAAlgorithm # Version locked - see SERVER-36618
+cryptography == 36.0.2; platform_machine != "s390x" and platform_machine != "ppc64le"
+
+mongo-ninja-python == 1.11.1.4; platform_machine == "x86_64" and sys_platform == "linux"
+ninja >= 1.10.0; platform_machine != "x86_64" or sys_platform != "linux"
+
+# Core (we need these for most buildscripts)
+psutil <= 5.8.0
+pymongo == 4.3.3
+PyYAML >= 3.0.0, <= 6.0.0
+types-PyYAML ~= 6.0.5
+requests >= 2.0.0, <= 2.26.0
+typing-extensions >= 3.7.4
+
+# Mongo compile
+Cheetah3 <= 3.2.6.post1 # src/mongo/base/generate_error_codes.py
+packaging <= 21.3
+regex <= 2021.11.10
+requirements_parser <= 0.3.1
+setuptools
+
+
+mongo-tooling-metrics == 1.0.7
+
+
+argparse==1.2.1

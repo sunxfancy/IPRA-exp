@@ -1,0 +1,15 @@
+# Core (we need these for most buildscripts)
+psutil <= 5.8.0
+pymongo >= 3.9, < 4.0
+PyYAML >= 3.0.0, <= 6.0.0
+requests >= 2.0.0, <= 2.26.0
+
+# Mongo compile
+Cheetah3 <= 3.2.6.post1 # src/mongo/base/generate_error_codes.py
+packaging <= 21.3
+regex <= 2021.11.10
+requirements_parser <= 0.3.1
+setuptools
+
+# mongo-perf
+argparse==1.2.1

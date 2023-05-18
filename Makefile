@@ -40,7 +40,7 @@ TASKSET:=
 # TASKSET:=taskset -c 0 
 
 REMOTE_PERF:=false
-PERF_PATH:=/usr/lib/linux-tools/5.15.0-57-generic/perf
+PERF_PATH:=/usr/lib/linux-tools/5.15.0-72-generic/perf
 # PERF_PATH:=/usr/lib/linux-hwe-tools-4.18.0-21/perf
 ifeq ($(REMOTE_PERF), true)
 	COPY_TO_REMOTE:=bash $(PWD)/scripts/copy-to-test-machine.sh
@@ -58,9 +58,13 @@ else
 	PERF:=$(PERF_PATH)
 endif 
 
+# Leave it empty if you don't want to use mold
+USE_MOLD:=  
+MOLD:= 
+
 # Use mold to speed up linking
-# MOLD:= mold -run
-MOLD:= $(INSTALL_PATH)/mold-1.8.0-x86_64-linux/bin/mold -run
+# USE_MOLD:= install/mold
+# MOLD:= $(INSTALL_PATH)/mold-1.8.0-x86_64-linux/bin/mold -run
 
 .PHONY: build check-tools install/llvm install/autofdo install/counter install/clang_proxy install/count-sum install/FDO
 build: check-tools  install/llvm install/autofdo install/counter install/clang_proxy install/count-sum install/DynamoRIO install/ppcount push-pop-counter/lib.o install/FDO
@@ -100,7 +104,7 @@ endef
 #     $(eval $(call lib-available,HAS_elf,libelf-dev))
 #     $(eval $(call lib-available,HAS_protobuf,protobuf-compiler))
 
-install/autofdo: build/autofdo install/mold
+install/autofdo: build/autofdo $(USE_MOLD)
 	cd $(BUILD_PATH)/autofdo && $(MOLD) ninja 
 	cd $(BUILD_PATH)/autofdo && ninja install
 	cd autofdo && $(BUILD_PATH)/autofdo/reg_profiler_test
@@ -136,19 +140,19 @@ install/mold:
 	cd $(INSTALL_PATH)/ && tar -xvf mold-1.8.0-x86_64-linux.tar.gz && rm mold-1.8.0-x86_64-linux.tar.gz
 	touch $@
 
-llvm: $(BUILD_PATH)/llvm/build.ninja install/mold
+llvm: $(BUILD_PATH)/llvm/build.ninja $(USE_MOLD)
 	$(MOLD) cmake --build $(BUILD_PATH)/llvm --config ${LLVM_BUILD_TYPE} -j $(shell nproc) --target clang lld
 	cp $(BUILD_PATH)/llvm/bin/clang-16 install/llvm/bin/clang-16
 	cp $(BUILD_PATH)/llvm/bin/lld install/llvm/bin/lld
 
-install/llvm: $(BUILD_PATH)/llvm/build.ninja install/mold
+install/llvm: $(BUILD_PATH)/llvm/build.ninja $(USE_MOLD)
 	mkdir -p install/llvm
 	$(MOLD) cmake --build $(BUILD_PATH)/llvm --config ${LLVM_BUILD_TYPE} -j $(shell nproc) --target install
 	$(MOLD) cmake --build $(BUILD_PATH)/llvm --config ${LLVM_BUILD_TYPE} -j $(shell nproc) --target install-profile
 
-$(BUILD_PATH)/llvm/build.ninja: LLVM-IPRA
+$(BUILD_PATH)/llvm/build.ninja: $(LLVM_IPRA)
 	mkdir -p build
-	cmake -G Ninja -B $(BUILD_PATH)/llvm -S LLVM-IPRA/llvm \
+	cmake -G Ninja -B $(BUILD_PATH)/llvm -S $(LLVM_IPRA)/llvm \
 		-DCMAKE_BUILD_TYPE=${LLVM_BUILD_TYPE} \
 		-DLLVM_ENABLE_ASSERTIONS=ON \
 		-DBUILD_SHARED_LIBS=OFF \
