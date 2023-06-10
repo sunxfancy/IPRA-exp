@@ -9,19 +9,23 @@ SOURCE = $(BUILD_PATH)/$(BENCHMARK)/mongo-$(MONGODB_VERSION)
 
 common_compiler_flags += \
 	 -Wno-error -Wno-error=int-conversion -Wno-error=implicit-function-declaration \
-	 -Wno-enum-constexpr-conversion -Wno-error=unused-but-set-variable -Wno-error=deprecated-copy
+	 -Wno-enum-constexpr-conversion -Wno-error=unused-but-set-variable -Wno-error=deprecated-copy -Wno-backend-plugin
 
 MAIN_BIN=install/bin/mongod
 BUILD_ACTION=build_mongo
-BUILD_TARGET=mongod
-INSTALL_TARGET=mongod
+BUILD_TARGET=install-core
+INSTALL_TARGET=install-core
+
+gen_compiler_flags =CCFLAGS=$(1)
+gen_linker_flags   =LINKFLAGS=$(1)
+
+
 
 define build_mongo
 	if [ -d "$(PWD)/$(1)" ]; then rm -rf $(PWD)/$(1); fi
 	mkdir -p $(BUILD_DIR)/$(1)
 	mkdir -p $(PWD)/$(1)
-	$(call clean_count_push_pop,$(1))
-
+	mkdir -p $(PWD)/$(1)/install/bin
 	cd $(SOURCE) && \
 		CLANG_PROXY_FOCUS=mongod \
 		CLANG_PROXY_ARGS="$(4)" CLANG_PROXY_VAR="$(5)" \
@@ -31,12 +35,11 @@ define build_mongo
 		--disable-warnings-as-errors  \
 		--build-dir=$(BUILD_DIR)/$(1) \
 		CC=$(NCC) CXX=$(NCXX) \
-		CFLAGS="$(common_compiler_flags) $(2)" \
-		CXXFLAGS="$(common_compiler_flags) $(2)" \
+		$(2) \
 		MONGO_VERSION=$(MONGODB_VERSION_FOR_BUILD) \
 		> $(PWD)/$(1)/build.log
-	cat $(PWD)/$(1).count-push-pop | $(COUNTSUM) > $(1).regprof0
 	$(call mv_binary,$(1))
+	cp $(BUILD_DIR)/$(1)/install/bin/mongo $(PWD)/$(1)/install/bin/mongo
 endef
 
 # cd $(BUILD_DIR)/$(1) && cmake -G Ninja $(SOURCE) \
@@ -50,14 +53,14 @@ endef
 # 	time -o $(PWD)/$(1)/time.log ninja $(3) -j $(shell nproc) -v > $(PWD)/$(1)/build.log \
 # 	|| { echo "*** build failed ***"; exit 1 ; }
 # cat $(PWD)/$(1).count-push-pop | $(COUNTSUM) > $(1).regprof0
-	
+
 
 
 define gen_perfdata
 
 $(1)$(2).perfdata: | $(1)/.complete
 	mkdir -p $(BENCH_DIR) && cd $(BENCH_DIR) && \
-		$(PERF) record -e cycles:u -j any,u -o ../$$@ -- $(TASKSET) $(PWD)/$(1)/$(MAIN_BIN)$(2) --db=$(BENCH_DIR)
+		bash "$(mkfile_path)run.sh" run_perf  ../$$@  $(1) $(2)
 	rm -rf $(BENCH_DIR) 
 	rm -rf $$@ 
 	mv $(BUILD_PATH)/$(BENCHMARK)/$$@ $$@
@@ -65,14 +68,14 @@ $(1)$(2).perfdata: | $(1)/.complete
 $(1)$(2).regprof2: | $(1)/.complete
 	rm -rf $(PWD)/$$@.raw
 	mkdir -p $(BENCH_DIR) && cd $(BENCH_DIR) && \
-		LLVM_IRPP_PROFILE="$(PWD)/$$@.raw" $(DRRUN) $(PWD)/$(1)/$(MAIN_BIN)$(2) --db=$(BENCH_DIR)
+		LLVM_IRPP_PROFILE="$(PWD)/$$@.raw" $(DRRUN) python benchrun.py -f testcases/simple_insert.js  -t 1 
 	rm -rf $(BENCH_DIR) 
 	cat $(PWD)/$$@.raw | $(COUNTSUM) > $(PWD)/$$@
 
 $(1)$(2).regprof3: | $(1).profbuild/.complete
 	rm -rf $(PWD)/$$@.raw
 	mkdir -p $(BENCH_DIR) && cd $(BENCH_DIR) && \
-		LLVM_IRPP_PROFILE="$(PWD)/$$@.raw" $(PWD)/$(1).profbuild/$(MAIN_BIN)$(2) --db=$(BENCH_DIR)
+		LLVM_IRPP_PROFILE="$(PWD)/$$@.raw" bash "$(mkfile_path)run.sh" run $(1).profbuild $(2)
 	rm -rf $(BENCH_DIR) 
 	cat $(PWD)/$$@.raw | $(COUNTSUM) > $(PWD)/$$@
 
@@ -82,10 +85,9 @@ define gen_bench
 
 $(1)$(2).bench: | $(1)/.complete
 	mkdir -p $(BENCH_DIR) && cd $(BENCH_DIR) && \
-		$(PERF) stat $(PERF_EVENTS) -o ../$$@ -r5 -- $(TASKSET) $(PWD)/$(1)/$(MAIN_BIN)$(2) --db=$(BENCH_DIR)
-	rm -rf $(BENCH_DIR)
-	rm -rf $$@
+		bash "$(mkfile_path)run.sh" run_bench  $(PWD)/$$@  $(1) $(2)
 	mv $(BUILD_PATH)/$(BENCHMARK)/$$@ $$@
+	rm -rf $(BENCH_DIR)
 
 endef 
 
@@ -107,7 +109,8 @@ instrumented/.complete: | $(SOURCE)/.complete
 instrumented.profdata: instrumented/.complete
 	rm -rf $(INSTRUMENTED_PROF)
 	mkdir -p $(BENCH_DIR)
-	cd $(BENCH_DIR) && $(PWD)/instrumented/$(MAIN_BIN) --db=$(BENCH_DIR)
+	cd $(BENCH_DIR) &&  bash "$(mkfile_path)run.sh" run instrumented \
+		|| { echo "*** loadtest failed ***" ; rm -f $(PWD)/$$@ ; exit 1; }
 	cd $(INSTRUMENTED_PROF) && $(LLVM_BIN)/llvm-profdata merge -output=$(PWD)/instrumented.profdata * && rm *.profraw
 	rm -rf $(BENCH_DIR) 
 
