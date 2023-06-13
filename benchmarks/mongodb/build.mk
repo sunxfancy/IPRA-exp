@@ -4,7 +4,7 @@ include $(mkfile_path)../common.mk
 
 MONGODB_VERSION=r5.3.2
 MONGODB_VERSION_FOR_BUILD=5.3.2
-URL=https://github.com/mongodb/mongo/archive/refs/tags/$(MONGODB_VERSION).zip
+URL=https://github.com/sunxfancy/mongodb-publish/releases/download/v5.3.2/mongo-r5.3.2.zip
 SOURCE = $(BUILD_PATH)/$(BENCHMARK)/mongo-$(MONGODB_VERSION)
 
 common_compiler_flags += \
@@ -115,15 +115,16 @@ instrumented.profdata: instrumented/.complete
 	rm -rf $(BENCH_DIR) 
 
 
-$(MONGODB_VERSION).zip: 
-	wget -q $(URL)
+mongo-$(MONGODB_VERSION).zip: 
+	wget -q $(URL) 
 
 mongo-perf.zip:
 	wget -q https://github.com/mongodb/mongo-perf/archive/refs/heads/master.zip -O mongo-perf.zip
 
-$(SOURCE)/.complete: $(MONGODB_VERSION).zip  mongo-perf.zip
+$(SOURCE)/.complete: mongo-$(MONGODB_VERSION).zip  mongo-perf.zip
 	mkdir -p $(BUILD_PATH)/$(BENCHMARK)
-	cd $(BUILD_PATH)/$(BENCHMARK) && unzip -q -o $(PWD)/$< && unzip -q -o $(PWD)/mongo-perf.zip
+	cd $(BUILD_PATH)/$(BENCHMARK) && unzip -q -o $(PWD)/mongo-perf.zip
+	mkdir -p $(SOURCE) && cd $(SOURCE) &&  unzip -q -o $(PWD)/$<
 	touch $@
 
 

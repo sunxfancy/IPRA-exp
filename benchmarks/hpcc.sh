@@ -40,6 +40,7 @@ function build() {
     run mysql
     run gcc
     run leveldb
+    run mongodb
 }
 
 function bench_each() {
@@ -69,6 +70,7 @@ function bench() {
     bench_each gcc
     bench_each mysql
     bench_each clang
+    bench_each mongodb
 }
 
 function regprof1() {
@@ -76,6 +78,7 @@ function regprof1() {
     run mysql regprof1
     run gcc regprof1
     run leveldb regprof1
+    run mongodb regprof1
 } 
 
 function regprof2() {
@@ -83,6 +86,7 @@ function regprof2() {
     run mysql regprof2
     run gcc regprof2
     run leveldb regprof2
+    run mongodb regprof2
 }
 
 function regprof3() {
@@ -90,6 +94,7 @@ function regprof3() {
     run mysql regprof3
     run gcc regprof3
     run leveldb regprof3
+    run mongodb regprof3
 }
 
 function all() {
