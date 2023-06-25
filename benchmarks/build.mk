@@ -1,9 +1,8 @@
 
-benchmarks: benchmarks/gcc/build benchmarks/leveldb/build  benchmarks/clang/build benchmarks/mysql/build  benchmarks/gcc/regprof3 benchmarks/leveldb/regprof3 benchmarks/clang/regprof3 benchmarks/mysql/regprof3  
+benchmarks: benchmarks-build benchmarks-regprof3   
 
-# make benchmarks/SPEC/bench
-
-benchmarks-build: benchmarks/clang/build benchmarks/mysql/build benchmarks/gcc/build # benchmarks/SPEC
+benchmarks-regprof3: benchmarks/gcc/regprof3 benchmarks/leveldb/regprof3 benchmarks/clang/regprof3 benchmarks/mysql/regprof3 benchmarks/mongodb/regprof3
+benchmarks-build: benchmarks/gcc/build benchmarks/leveldb/build benchmarks/clang/build benchmarks/mysql/build  benchmarks/mongodb/build 
 
 FDOIPRA_FLAVORS := fdoipra bfdoipra fdoipra2 bfdoipra2 fdoipra3 bfdoipra3 fdoipra4 bfdoipra4 fdoipra5 bfdoipra5 fdoipra6 bfdoipra6
 PGO_FULL_FLAVORS := pgo-full $(foreach f,$(FDOIPRA_FLAVORS),pgo-full-$(f)) pgo-full-ipra

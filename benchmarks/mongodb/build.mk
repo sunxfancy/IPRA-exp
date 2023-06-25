@@ -15,19 +15,40 @@ MAIN_BIN=install/bin/mongod
 BUILD_ACTION=build_mongo
 BUILD_TARGET=install-core
 INSTALL_TARGET=install-core
+BUILD_TMP_BIN=opt/mongo/db/mongod
 
 gen_compiler_flags =CCFLAGS=$(1)
 gen_linker_flags   =LINKFLAGS=$(1)
 
+export MYPWD=$(PWD)
 
+define mv_binary_mongo
+	 @cp  $(BUILD_DIR)/$(1)/$(BUILD_TMP_BIN)    $(PWD)/$(1)/$(MAIN_BIN)
+	-@cp  $(BUILD_DIR)/$(1)/$(BUILD_TMP_BIN).0  $(PWD)/$(1)/$(MAIN_BIN).1-10
+	-@cp  $(BUILD_DIR)/$(1)/$(BUILD_TMP_BIN).1  $(PWD)/$(1)/$(MAIN_BIN).3-10
+	-@cp  $(BUILD_DIR)/$(1)/$(BUILD_TMP_BIN).2  $(PWD)/$(1)/$(MAIN_BIN).5-10
+	-@cp  $(BUILD_DIR)/$(1)/$(BUILD_TMP_BIN).3  $(PWD)/$(1)/$(MAIN_BIN).10-10
+	-@cp  $(BUILD_DIR)/$(1)/$(BUILD_TMP_BIN).4  $(PWD)/$(1)/$(MAIN_BIN).1-20
+	-@cp  $(BUILD_DIR)/$(1)/$(BUILD_TMP_BIN).5  $(PWD)/$(1)/$(MAIN_BIN).3-20
+	-@cp  $(BUILD_DIR)/$(1)/$(BUILD_TMP_BIN).6  $(PWD)/$(1)/$(MAIN_BIN).5-20
+	-@cp  $(BUILD_DIR)/$(1)/$(BUILD_TMP_BIN).7  $(PWD)/$(1)/$(MAIN_BIN).10-20
+endef
+
+# rm -rf $(PWD)/$(1)/.env 
+# touch $(PWD)/$(1)/.env
+# echo "CLANG_PROXY_FOCUS=mongod" >> $(PWD)/$(1)/.env
+# echo "CLANG_PROXY_ARGS=\"$(4)\"" >> $(PWD)/$(1)/.env
+# echo "CLANG_PROXY_VAR=\"$(5)\"" >> $(PWD)/$(1)/.env
 
 define build_mongo
 	if [ -d "$(PWD)/$(1)" ]; then rm -rf $(PWD)/$(1); fi
 	mkdir -p $(BUILD_DIR)/$(1)
 	mkdir -p $(PWD)/$(1)
 	mkdir -p $(PWD)/$(1)/install/bin
+
+
 	cd $(SOURCE) && \
-		CLANG_PROXY_FOCUS=mongod \
+		CLANG_PROXY_FOCUS=mongod CLANG_PROXY_DEBUG=1 \
 		CLANG_PROXY_ARGS="$(4)" CLANG_PROXY_VAR="$(5)" \
 		GIT_PYTHON_REFRESH=quiet \
 		time -o $(PWD)/$(1)/time.log \
@@ -38,7 +59,7 @@ define build_mongo
 		$(2) \
 		MONGO_VERSION=$(MONGODB_VERSION_FOR_BUILD) \
 		> $(PWD)/$(1)/build.log
-	$(call mv_binary,$(1))
+	$(call mv_binary_mongo,$(1))
 	cp $(BUILD_DIR)/$(1)/install/bin/mongo $(PWD)/$(1)/install/bin/mongo
 endef
 
