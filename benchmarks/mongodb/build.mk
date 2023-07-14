@@ -104,9 +104,9 @@ endef
 
 define gen_bench
 
-$(1)$(2).bench: | $(1)/.complete
+$(1)$(2).bench: # | $(1)/.complete
 	mkdir -p $(BENCH_DIR) && cd $(BENCH_DIR) && \
-		bash "$(mkfile_path)run.sh" run_bench  $(PWD)/$$@  $(1) $(2)
+		bash "$(mkfile_path)run.sh" run_bench  ../$$@  $(1) $(2)
 	mv $(BUILD_PATH)/$(BENCHMARK)/$$@ $$@
 	rm -rf $(BENCH_DIR)
 

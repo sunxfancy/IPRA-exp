@@ -40,10 +40,10 @@ function run_bench() {
     start_mongod $2 $3 "$mongod_name"
     echo "Running benchmarking ... $pwd/../mongo-perf-master"
     cd $pwd/../mongo-perf-master && \
-      echo ${PERF_PATH} stat ${PERF_EVENTS}  --repeat 5 -o "$1" --pid `cat $pwd/${mongod_dir}/mongod.pid`  -- \
-        python benchrun.py -f testcases/simple_insert.js  -t 1 --host=$pwd/${mongod_dir}/mongod.sock -s "${MYPWD}/$1/install/bin/mongo" && \
-      ${PERF_PATH} stat ${PERF_EVENTS}  --repeat 5 -o "$1" --pid `cat $pwd/${mongod_dir}/mongod.pid`  -- \
-        python benchrun.py -f testcases/simple_insert.js  -t 1 --host=$pwd/${mongod_dir}/mongod.sock -s "${MYPWD}/$1/install/bin/mongo"
+      echo ${PERF_PATH} stat ${PERF_EVENTS} -o "$1" --pid `cat $pwd/${mongod_dir}/mongod.pid`  -- \
+        python benchrun.py -f testcases/simple_insert.js  -t 1 --host=$pwd/${mongod_dir}/mongod.sock -s "${MYPWD}/$2/install/bin/mongo" && \
+      ${PERF_PATH} stat ${PERF_EVENTS} -o "$1" --pid `cat $pwd/${mongod_dir}/mongod.pid`  -- \
+        python benchrun.py -f testcases/simple_insert.js  -t 1 --host=$pwd/${mongod_dir}/mongod.sock -s "${MYPWD}/$2/install/bin/mongo"
     stop_mongod "$mongod_dir"
 }
 
@@ -56,7 +56,7 @@ function run_perf() {
     echo ${PERF_PATH} record -e cycles:u -j any -o "$1" --pid `cat $pwd/${mongod_dir}/mongod.pid` 
     cd $pwd/../mongo-perf-master && \
       ${PERF_PATH} record -e cycles:u -j any -o "$1" --pid `cat $pwd/${mongod_dir}/mongod.pid` -- \
-        python benchrun.py -f testcases/simple_insert.js  -t 1 --host=$pwd/${mongod_dir}/mongod.sock -s "${MYPWD}/$1/install/bin/mongo" 
+        python benchrun.py -f testcases/simple_insert.js  -t 1 --host=$pwd/${mongod_dir}/mongod.sock -s "${MYPWD}/$2/install/bin/mongo" 
     stop_mongod "$mongod_dir"
 }
 
