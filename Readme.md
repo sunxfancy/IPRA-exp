@@ -172,6 +172,10 @@ Build FDOIPRA
 
 -Wl,-mllvm -fdo-ipra -Wl,-fdoipra-new-impl  -Wl,-mllvm -Wl,-fdoipra-both-hot=false  -Wl,-mllvm -Wl,-fdoipra-ch=1 -Wl,-mllvm -Wl,-fdoipra-hc=1   -Wl,-mllvm -Wl,-fdoipra-use-caller-reg=1
 
+Flags for the hot list:
+
+-Wl,-mllvm -Wl,-fdoipra-hot-list=hot_list
+
 | fdo-ipra | Enable FDOIPRA pass |
 | --- | --- |
 | fdoipra-new-impl   | There are two implementation, the new one supports ThinLTO which should be good to use.  |
