@@ -85,6 +85,14 @@ func mainReturnWithCode() int {
 	args := os.Getenv("CLANG_PROXY_ARGS")
 	variant := os.Getenv("CLANG_PROXY_VAR")
 	debug := os.Getenv("CLANG_PROXY_DEBUG")
+
+	fmt.Println("Proxy Debug Enable = ", debug)
+	if debug == "" {
+		for _, e := range os.Environ() {
+			pair := strings.SplitN(e, "=", 2)
+			fmt.Println(pair[0], "=", pair[1])
+		}
+	}
 	
 	if focus == "" {
 		return RunCommand(convert(os.Args[0]), os.Args[1:]...)
@@ -100,6 +108,10 @@ func mainReturnWithCode() int {
 			}
 			if debug != "" {
 				debug_print = true
+				for _, e := range os.Environ() {
+					pair := strings.SplitN(e, "=", 2)
+					fmt.Println(pair[0], "=", pair[1])
+				}
 			}
 			if variant != "" {
 				return handleVariant(variant, list, original, i)

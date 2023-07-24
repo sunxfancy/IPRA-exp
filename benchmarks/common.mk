@@ -214,7 +214,7 @@ define mv_binary
 	-@cp  $(BUILD_DIR)/$(1)/$(MAIN_BIN).5  $(PWD)/$(1)/$(MAIN_BIN).3-20
 	-@cp  $(BUILD_DIR)/$(1)/$(MAIN_BIN).6  $(PWD)/$(1)/$(MAIN_BIN).5-20
 	-@cp  $(BUILD_DIR)/$(1)/$(MAIN_BIN).7  $(PWD)/$(1)/$(MAIN_BIN).10-20
-	 @cat $(PWD)/$(1).count-push-pop | $(COUNTSUM) > $(1).regprof0
+	-@cat $(PWD)/$(1).count-push-pop | $(COUNTSUM) > $(1).regprof0
 	-@cat $(PWD)/$(1).1-10.count-push-pop | $(COUNTSUM) > $(1).1-10.regprof0
 	-@cat $(PWD)/$(1).3-10.count-push-pop | $(COUNTSUM) > $(1).3-10.regprof0
 	-@cat $(PWD)/$(1).5-10.count-push-pop | $(COUNTSUM) > $(1).5-10.regprof0
