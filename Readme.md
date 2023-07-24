@@ -107,7 +107,77 @@ Available A: 1 3 5 10
 Availabel B: 10 20
 
 
+# How to optimize Google's binary
 
+## 1. Apply patches to LLVM 16 and build autofdo
 
+[IPRA-exp/fdoipra.patch at main · sunxfancy/IPRA-exp (github.com)](https://github.com/sunxfancy/IPRA-exp/blob/main/fdoipra.patch)
+
+[IPRA-exp/fix.patch at main · sunxfancy/IPRA-exp (github.com)](https://github.com/sunxfancy/IPRA-exp/blob/main/fix.patch)
+
+Build LLVM and Clang
+
+Build modified version of autofdo (dev branch)  [sunxfancy/autofdo at dev (github.com)](https://github.com/sunxfancy/autofdo/tree/dev)
+
+## 2. Build PGO LTO version of your binary
+
+a. Build instrumented version:
+
+-fprofile-generate=<output_path>
+
+b. Run tests and profile merge:
+
+… // run tests
+
+cd <output_path> && llvm-profdata merge -output=instrumented.profdata *
+
+c. Build optimized version:
+
+-flto=thin -fprofile-use=instrumented.profdata  -Wl,--lto-basic-block-sections=labels  -Wl,--build-id 
+
+Other flags to avoid bugs:
+
+-fno-optimize-sibling-calls  -Wl,-mllvm -Wl,-fast-isel=false -Wl,-Bsymbolic-non-weak-functions
+
+Other flags for best performance:
+
+-fsplit-machine-functions
+
+## 3. Collect Perf Data using your PGO LTO build and build hot list
+
+a. Run PGO Optimized Version with perf record
+
+perf record -e cycles:u -j any -o  samples
+
+b. Generate hotlist
+
+```makefile
+hot_list_creator
+    --binary="<PGO VERSION>" \
+		--profile="<Sample>" \
+		--output="hot_list" \
+		--detail="detail" \  # for debugging
+		--hot_threshold=3  # 3 counts in samples will mark the function hot
+```
+
+## 4. Build the final Binary
+
+The last step is to build the final binary using two different groups o information:
+
+a. The PGO profile data
+
+b. The hot list
+
+Build FDOIPRA
+
+-Wl,-mllvm -fdo-ipra -Wl,-fdoipra-new-impl  -Wl,-mllvm -Wl,-fdoipra-both-hot=false  -Wl,-mllvm -Wl,-fdoipra-ch=1 -Wl,-mllvm -Wl,-fdoipra-hc=1   -Wl,-mllvm -Wl,-fdoipra-use-caller-reg=1
+
+| fdo-ipra | Enable FDOIPRA pass |
+| --- | --- |
+| fdoipra-new-impl   | There are two implementation, the new one supports ThinLTO which should be good to use.  |
+| fdoipra-both-hot | False: only function hot in entry will be considered. True: function hot in entry and body will both be considered as candidates for optimization. |
+| fdoipra-ch | Enable optimization for cold-callsite-hot-callee |
+| fdoipra-hc | Enable optimization for hot-callsite-cold-callee |
+| fdoipra-use-caller-reg | Enable optimization for transferring callee saved registers to caller saved. |
 
 
